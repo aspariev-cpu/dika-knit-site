@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dika Knit — Дашборд</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header class="mobile-header">
+        <div class="header-content">
+            <div class="header-left">
+                <span class="logo-icon">🧵</span>
+                <span class="logo-text">Dika Knit</span>
+            </div>
+            <div class="header-right">
+                <span class="user-name" id="userName">Загрузка...</span>
+                <button class="btn-logout" onclick="logout()">🚪</button>
+            </div>
+        </div>
+    </header>
+    
+    <main class="mobile-main">
+        <!-- Статистика -->
+        <section class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-icon">🧵</div>
+                <div class="stat-value" id="statToday">--</div>
+                <div class="stat-label">Сегодня</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📋</div>
+                <div class="stat-value" id="statTasks">--</div>
+                <div class="stat-label">В работе</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🖥️</div>
+                <div class="stat-value" id="statMachines">--</div>
+                <div class="stat-label">Станки</div>
+            </div>
+            <div class="stat-card urgent">
+                <div class="stat-icon">🔥</div>
+                <div class="stat-value" id="statUrgent">--</div>
+                <div class="stat-label">Срочных</div>
+            </div>
+        </section>
+        
+        <!-- Навигация -->
+        <nav class="mobile-nav">
+            <a href="/worker" class="nav-card">
+                <span class="nav-icon">🖥️</span>
+                <span class="nav-label">Станки</span>
+            </a>
+            <a href="/worker?tab=tasks" class="nav-card">
+                <span class="nav-icon">📋</span>
+                <span class="nav-label">Задания</span>
+            </a>
+            <a href="/worker?tab=salary" class="nav-card">
+                <span class="nav-icon">💰</span>
+                <span class="nav-label">Зарплата</span>
+            </a>
+            <a href="/admin" class="nav-card admin-only" id="adminNav">
+                <span class="nav-icon">👑</span>
+                <span class="nav-label">Админ</span>
+            </a>
+        </nav>
+        
+        <!-- Активные задания -->
+        <section class="tasks-section">
+            <div class="section-header">
+                <h2>Активные задания</h2>
+                <span class="badge" id="tasksCount">0</span>
+            </div>
+            <div class="tasks-list" id="tasksList">
+                <div class="loading">Загрузка...</div>
+            </div>
+        </section>
+        
+        <!-- Станки -->
+        <section class="machines-section">
+            <div class="section-header">
+                <h2>Станки</h2>
+                <span class="badge" id="machinesCount">0/15</span>
+            </div>
+            <div class="machines-grid" id="machinesGrid">
+                <div class="loading">Загрузка...</div>
+            </div>
+        </section>
+    </main>
+    
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

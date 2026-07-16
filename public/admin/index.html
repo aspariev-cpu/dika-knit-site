@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dika Knit — Админ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header class="mobile-header">
+        <div class="header-content">
+            <div class="header-left">
+                <a href="/dashboard" class="back-btn">‹</a>
+                <span class="logo-text">Админ-панель</span>
+            </div>
+            <div class="header-right">
+                <span class="user-name" id="userName">Админ</span>
+            </div>
+        </div>
+    </header>
+    
+    <main class="mobile-main">
+        <div class="admin-grid">
+            <a href="/admin?section=workers" class="admin-card">
+                <span class="admin-icon">👥</span>
+                <span class="admin-label">Сотрудники</span>
+            </a>
+            <a href="/admin?section=models" class="admin-card">
+                <span class="admin-icon">📦</span>
+                <span class="admin-label">Модели</span>
+            </a>
+            <a href="/admin?section=colors" class="admin-card">
+                <span class="admin-icon">🎨</span>
+                <span class="admin-label">Цвета</span>
+            </a>
+            <a href="/admin?section=tasks" class="admin-card">
+                <span class="admin-icon">📋</span>
+                <span class="admin-label">Задания</span>
+            </a>
+            <a href="/admin?section=stats" class="admin-card">
+                <span class="admin-icon">📊</span>
+                <span class="admin-label">Статистика</span>
+            </a>
+            <a href="/admin?section=shifts" class="admin-card">
+                <span class="admin-icon">🔄</span>
+                <span class="admin-label">Смены</span>
+            </a>
+        </div>
+    </main>
+    
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>
