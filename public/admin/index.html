@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dika Knit — Админ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        /* ======================================== */
+        /*  АДМИН-СТИЛИ ДЛЯ МОБИЛКИ               */
+        /* ======================================== */
+        
+        .admin-container {
+            padding: 16px;
+            max-width: 100%;
+        }
+
+        /* Верхняя панель */
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid rgba(201,169,89,0.08);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+        .admin-header .logo {
+            font-size: 20px;
+            font-weight: 800;
+            color: #c9a959;
+        }
+        .admin-header .logo span {
+            color: #fff;
+            font-weight: 300;
+        }
+        .admin-header .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #8892b0;
+            font-size: 13px;
+        }
+        .admin-header .user-info .avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #c9a959;
+            color: #0a0e1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 13px;
+        }
+        .admin-header .user-info .logout {
+            color: #f87171;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        /* Навигация админа */
+        .admin-nav {
+            display: flex;
+            gap: 6px;
+            padding: 12px 16px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid rgba(201,169,89,0.05);
+            flex-wrap: nowrap;
+        }
+        .admin-nav .nav-btn {
+            padding: 6px 14px;
+            border: 1px solid rgba(201,169,89,0.15);
+            border-radius: 20px;
+            background: transparent;
+            color: #8892b0;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: 0.2s;
+            font-family: inherit;
+        }
+        .admin-nav .nav-btn.active {
+            background: rgba(201,169,89,0.15);
+            border-color: #c9a959;
+            color: #c9a959;
+        }
+        .admin-nav .nav-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Статистика */
+        .stats-grid-mobile {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            padding: 12px 0;
+        }
+        .stat-card-mobile {
+            background: rgba(255,255,255,0.04);
+            border-radius: 12px;
+            padding: 12px 8px;
+            text-align: center;
+            border: 1px solid rgba(201,169,89,0.06);
+        }
+        .stat-card-mobile .icon {
+            font-size: 20px;
+            display: block;
+        }
+        .stat-card-mobile .value {
+            font-size: 20px;
+            font-weight: 800;
+            color: #c9a959;
+        }
+        .stat-card-mobile .label {
+            font-size: 10px;
+            color: #8892b0;
+        }
+
+        /* Создание задания */
+        .create-task-mobile {
+            background: rgba(255,255,255,0.04);
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid rgba(201,169,89,0.08);
+            margin: 12px 0;
+        }
+        .create-task-mobile h3 {
+            color: #c9a959;
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .create-task-mobile .form-group {
+            margin-bottom: 10px;
+        }
+        .create-task-mobile .form-group label {
+            font-size: 11px;
+            color: #8892b0;
+            font-weight: 500;
+            display: block;
+            margin-bottom: 3px;
+        }
+        .create-task-mobile .form-group select,
+        .create-task-mobile .form-group input {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(201,169,89,0.1);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        .create-task-mobile .form-group select:focus,
+        .create-task-mobile .form-group input:focus {
+            outline: none;
+            border-color: #c9a959;
+        }
+        .create-task-mobile .form-group select option {
+            background: #1a1f36;
+            color: #fff;
+        }
+        .create-task-mobile .coat-parts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .create-task-mobile .coat-parts .part-field {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .create-task-mobile .coat-parts .part-field label {
+            font-size: 10px;
+            color: #8892b0;
+        }
+        .create-task-mobile .coat-parts .part-field input {
+            padding: 6px 10px;
+            font-size: 13px;
+        }
+        .create-task-mobile .urgent-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 8px 0;
+        }
+        .create-task-mobile .urgent-check input {
+            width: 18px;
+            height: 18px;
+        }
+        .create-task-mobile .urgent-check label {
+            color: #f87171;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .btn-submit-mobile {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #c9a959, #b89840);
+            border: none;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 15px;
+            color: #0a0e1a;
+            cursor: pointer;
+            font-family: inherit;
+            margin-top: 8px;
+        }
+        .btn-submit-mobile:active {
+            transform: scale(0.98);
+        }
+
+        /* Таблица */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 12px 0;
+            border-radius: 12px;
+            border: 1px solid rgba(201,169,89,0.06);
+            background: rgba(255,255,255,0.02);
+        }
+        .table-wrapper table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            min-width: 600px;
+        }
+        .table-wrapper th {
+            text-align: left;
+            padding: 10px 12px;
+            background: rgba(201,169,89,0.05);
+            color: #c9a959;
+            font-weight: 600;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+        .table-wrapper td {
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            color: #ddd;
+            font-size: 12px;
+            vertical-align: middle;
+        }
+        .table-wrapper .status-badge {
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            display: inline-block;
+            white-space: nowrap;
+        }
+        .status-pending { background: rgba(255,193,7,0.15); color: #ffc107; }
+        .status-in_progress { background: rgba(96,165,250,0.15); color: #60a5fa; }
+        .status-completed { background: rgba(74,222,128,0.15); color: #4ade80; }
+        .table-wrapper .progress-mini {
+            display: inline-block;
+            width: 40px;
+            height: 3px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 2px;
+            overflow: hidden;
+            vertical-align: middle;
+        }
+        .table-wrapper .progress-mini .fill {
+            height: 100%;
+            background: linear-gradient(90deg, #c9a959, #e8c97a);
+            border-radius: 2px;
+        }
+        .table-wrapper .action-btns {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .table-wrapper .action-btns .btn-act {
+            padding: 2px 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .table-wrapper .action-btns .btn-edit { background: #c9a959; color: #0a0e1a; }
+        .table-wrapper .action-btns .btn-duplicate { background: #60a5fa; color: #fff; }
+        .table-wrapper .action-btns .btn-delete { background: #f87171; color: #fff; }
+
+        /* Поиск */
+        .search-bar {
+            display: flex;
+            gap: 8px;
+            padding: 8px 0;
+        }
+        .search-bar input {
+            flex: 1;
+            padding: 10px 14px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(201,169,89,0.1);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        .search-bar input:focus {
+            outline: none;
+            border-color: #c9a959;
+        }
+        .search-bar input::placeholder {
+            color: #475569;
+        }
+        .search-bar .badge {
+            color: #8892b0;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Секции */
+        .section-tab {
+            display: none;
+        }
+        .section-tab.active {
+            display: block;
+        }
+
+        /* Адаптив */
+        @media (max-width: 480px) {
+            .stats-grid-mobile {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 6px;
+            }
+            .stat-card-mobile .value {
+                font-size: 18px;
+            }
+            .create-task-mobile .coat-parts {
+                grid-template-columns: 1fr;
+            }
+            .admin-nav {
+                gap: 4px;
+                padding: 8px 12px;
+            }
+            .admin-nav .nav-btn {
+                font-size: 11px;
+                padding: 4px 10px;
+            }
+        }
+
+        /* Модалка */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .modal-content {
+            background: #1a1f36;
+            padding: 24px;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 100%;
+            border: 1px solid rgba(201,169,89,0.1);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-content h2 {
+            color: #c9a959;
+            font-size: 18px;
+            margin-bottom: 16px;
+        }
+        .modal-content .form-group {
+            margin-bottom: 12px;
+        }
+        .modal-content .form-group label {
+            font-size: 11px;
+            color: #8892b0;
+            display: block;
+            margin-bottom: 3px;
+        }
+        .modal-content .form-group input,
+        .modal-content .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(201,169,89,0.1);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        .modal-content .form-group input:focus,
+        .modal-content .form-group select:focus {
+            outline: none;
+            border-color: #c9a959;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .modal-buttons .btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+        }
+        .modal-buttons .btn-primary {
+            background: linear-gradient(135deg, #c9a959, #b89840);
+            color: #0a0e1a;
+        }
+        .modal-buttons .btn-secondary {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+        }
+        .modal-buttons .btn-danger {
+            background: #f87171;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ======================================== -->
+    <!--  ШАПКА                                   -->
+    <!-- ======================================== -->
+    <header class="admin-header">
+        <div class="logo">Dika <span>Knit</span></div>
+        <div class="user-info">
+            <span class="avatar" id="userAvatar">A</span>
+            <span id="userName">Админ</span>
+            <a href="#" class="logout" onclick="logout()">🚪</a>
+        </div>
+    </header>
+
+    <!-- ======================================== -->
+    <!--  НАВИГАЦИЯ                               -->
+    <!-- ======================================== -->
+    <nav class="admin-nav">
+        <button class="nav-btn active" data-tab="dashboard">📊 Дашборд</button>
+        <button class="nav-btn" data-tab="tasks">📋 Задания</button>
+        <button class="nav-btn" data-tab="create">➕ Создать</button>
+        <button class="nav-btn" data-tab="models">🧵 Модели</button>
+        <button class="nav-btn" data-tab="colors">🎨 Цвета</button>
+        <button class="nav-btn" data-tab="workers">👥 Сотрудники</button>
+    </nav>
+
+    <!-- ======================================== -->
+    <!--  ОСНОВНОЙ КОНТЕНТ                        -->
+    <!-- ======================================== -->
+    <div class="admin-container">
+
+        <!-- ======================================== -->
+        <!--  ВКЛАДКА: ДАШБОРД                       -->
+        <!-- ======================================== -->
+        <div class="section-tab active" id="tab-dashboard">
+            <div class="stats-grid-mobile" id="statsGrid">
+                <div class="stat-card-mobile">
+                    <span class="icon">📋</span>
+                    <div class="value" id="statTotal">--</div>
+                    <div class="label">Всего</div>
+                </div>
+                <div class="stat-card-mobile">
+                    <span class="icon">✅</span>
+                    <div class="value" id="statCompleted">--</div>
+                    <div class="label">Готово</div>
+                </div>
+                <div class="stat-card-mobile">
+                    <span class="icon">🔄</span>
+                    <div class="value" id="statInProgress">--</div>
+                    <div class="label">В работе</div>
+                </div>
+                <div class="stat-card-mobile">
+                    <span class="icon">⏳</span>
+                    <div class="value" id="statPending">--</div>
+                    <div class="label">В очереди</div>
+                </div>
+            </div>
+
+            <!-- Таблица всех заданий -->
+            <div class="search-bar">
+                <input type="text" id="taskSearch" placeholder="🔍 Поиск по заданиям...">
+                <span class="badge">Найдено: <strong id="searchCount">0</strong></span>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Модель</th>
+                            <th>Цвет</th>
+                            <th>Кол-во</th>
+                            <th>Связано</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tasksTableBody">
+                        <tr><td colspan="6" style="text-align:center; padding:30px; color:#475569;">Загрузка...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ======================================== -->
+        <!--  ВКЛАДКА: СОЗДАНИЕ ЗАДАНИЯ              -->
+        <!-- ======================================== -->
+        <div class="section-tab" id="tab-create">
+            <div class="create-task-mobile">
+                <h3>➕ Создать задание</h3>
+                <form id="createTaskForm">
+                    <div class="form-group">
+                        <label>📋 Модель</label>
+                        <select id="createModel" required>
+                            <option value="">Выберите модель...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>🎨 Основной цвет</label>
+                        <select id="createColor" required>
+                            <option value="">Выберите цвет...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>➕ Дополнительный цвет</label>
+                        <select id="createColor2">
+                            <option value="">Без доп. цвета</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>🏢 ИП</label>
+                        <select id="createIp" required>
+                            <option value="">Выберите ИП...</option>
+                            <option value="ИП Алла">ИП Алла</option>
+                            <option value="ИП Заур">ИП Заур</option>
+                        </select>
+                    </div>
+
+                    <!-- Для шапки -->
+                    <div id="shapkaFields" class="form-group">
+                        <label>📦 Количество</label>
+                        <input type="number" id="createQuantity" placeholder="шт." min="1">
+                    </div>
+
+                    <!-- Для кофты -->
+                    <div id="coatFields" style="display:none;">
+                        <div style="color:#c9a959; font-weight:600; font-size:13px; margin-bottom:8px;">🧥 Детали кофты</div>
+                        <div class="coat-parts" id="coatPartsContainer"></div>
+                    </div>
+
+                    <div class="urgent-check">
+                        <input type="checkbox" id="createUrgent">
+                        <label for="createUrgent">🔥 Срочно</label>
+                    </div>
+
+                    <button type="submit" class="btn-submit-mobile">💾 Создать</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ======================================== -->
+        <!--  ВКЛАДКА: МОДЕЛИ                        -->
+        <!-- ======================================== -->
+        <div class="section-tab" id="tab-models">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 style="color:#c9a959;">🧵 Модели</h3>
+                <button onclick="openModelModal()" style="padding:6px 14px; background:rgba(201,169,89,0.15); border:1px solid rgba(201,169,89,0.2); border-radius:8px; color:#c9a959; font-weight:600; cursor:pointer;">➕ Добавить</button>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Название</th><th>Программа</th><th>Тип</th><th>Действия</th></tr>
+                    </thead>
+                    <tbody id="modelsTableBody">
+                        <tr><td colspan="4" style="text-align:center; padding:20px; color:#475569;">Загрузка...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ======================================== -->
+        <!--  ВКЛАДКА: ЦВЕТА                         -->
+        <!-- ======================================== -->
+        <div class="section-tab" id="tab-colors">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 style="color:#c9a959;">🎨 Цвета</h3>
+                <button onclick="openColorModal()" style="padding:6px 14px; background:rgba(201,169,89,0.15); border:1px solid rgba(201,169,89,0.2); border-radius:8px; color:#c9a959; font-weight:600; cursor:pointer;">➕ Добавить</button>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Название</th><th>Действия</th></tr>
+                    </thead>
+                    <tbody id="colorsTableBody">
+                        <tr><td colspan="2" style="text-align:center; padding:20px; color:#475569;">Загрузка...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ======================================== -->
+        <!--  ВКЛАДКА: СОТРУДНИКИ                    -->
+        <!-- ======================================== -->
+        <div class="section-tab" id="tab-workers">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 style="color:#c9a959;">👥 Сотрудники</h3>
+                <button onclick="openWorkerModal()" style="padding:6px 14px; background:rgba(201,169,89,0.15); border:1px solid rgba(201,169,89,0.2); border-radius:8px; color:#c9a959; font-weight:600; cursor:pointer;">➕ Добавить</button>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>ФИО</th><th>Логин</th><th>Действия</th></tr>
+                    </thead>
+                    <tbody id="workersTableBody">
+                        <tr><td colspan="3" style="text-align:center; padding:20px; color:#475569;">Загрузка...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ======================================== -->
+    <!--  МОДАЛКИ                                 -->
+    <!-- ======================================== -->
+
+    <!-- Модалка редактирования задания -->
+    <div id="editTaskModal" class="modal">
+        <div class="modal-content">
+            <h2>✏️ Редактирование #<span id="editTaskId">0</span></h2>
+            <form id="editTaskForm">
+                <div class="form-group">
+                    <label>📦 Количество</label>
+                    <input type="number" id="editQuantity" min="0">
+                </div>
+                <div class="form-group">
+                    <label>🔧 Связано</label>
+                    <input type="number" id="editDone" min="0">
+                </div>
+                <div class="form-group">
+                    <label>📌 Статус</label>
+                    <select id="editStatus">
+                        <option value="pending">⏳ Ожидает</option>
+                        <option value="in_progress">🔄 В работе</option>
+                        <option value="completed">✅ Готово</option>
+                    </select>
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('editTaskModal')">❌ Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модалка модели -->
+    <div id="modelModal" class="modal">
+        <div class="modal-content">
+            <h2>🧵 Добавить модель</h2>
+            <form id="modelForm">
+                <div class="form-group">
+                    <label>Название</label>
+                    <input type="text" id="modelName" required>
+                </div>
+                <div class="form-group">
+                    <label>Программа</label>
+                    <input type="text" id="modelProgram">
+                </div>
+                <div class="form-group">
+                    <label>Размер</label>
+                    <input type="text" id="modelSize">
+                </div>
+                <div class="form-group">
+                    <label>Класс</label>
+                    <input type="text" id="modelClass">
+                </div>
+                <div class="form-group">
+                    <label>Пряжа</label>
+                    <input type="text" id="modelYarn">
+                </div>
+                <div class="form-group">
+                    <label>Тип</label>
+                    <select id="modelType">
+                        <option value="false">🧢 Шапка</option>
+                        <option value="true">🧥 Кофта</option>
+                    </select>
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modelModal')">❌ Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модалка цвета -->
+    <div id="colorModal" class="modal">
+        <div class="modal-content">
+            <h2>🎨 Добавить цвет</h2>
+            <form id="colorForm">
+                <div class="form-group">
+                    <label>Название</label>
+                    <input type="text" id="colorName" required>
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('colorModal')">❌ Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модалка сотрудника -->
+    <div id="workerModal" class="modal">
+        <div class="modal-content">
+            <h2>👥 Добавить сотрудника</h2>
+            <form id="workerForm">
+                <div class="form-group">
+                    <label>ФИО</label>
+                    <input type="text" id="workerFullName" required>
+                </div>
+                <div class="form-group">
+                    <label>Логин</label>
+                    <input type="text" id="workerLogin" required>
+                </div>
+                <div class="form-group">
+                    <label>Пароль</label>
+                    <input type="password" id="workerPassword" required minlength="6">
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('workerModal')">❌ Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ======================================== -->
+    <!--  СКРИПТЫ                                 -->
+    <!-- ======================================== -->
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/admin.js"></script>
+</body>
+</html>

@@ -2,45 +2,33 @@
  * auth.js — Управление авторизацией
  */
 
-// ========================================
-//  ВХОД
-// ========================================
-
 async function loginUser(login, password) {
     try {
         const result = await api.login(login, password);
-        
+
         if (result.success) {
             showToast('✅ Вход выполнен успешно!', 'success');
             setTimeout(() => {
                 window.location.href = '/dashboard';
-            }, 500);
+            }, 400);
             return { success: true };
         } else {
             showToast(result.error || 'Ошибка входа', 'error');
             return { success: false, error: result.error };
         }
     } catch (err) {
-        showToast('❌ Ошибка соединения с сервером', 'error');
+        showToast('❌ Ошибка соединения', 'error');
         return { success: false, error: err.message };
     }
 }
 
-// ========================================
-//  ВЫХОД
-// ========================================
-
 async function logout() {
     api.clearToken();
-    showToast('👋 Вы вышли из системы', 'info');
+    showToast('👋 Вы вышли', 'info');
     setTimeout(() => {
         window.location.href = '/login.html';
-    }, 500);
+    }, 400);
 }
-
-// ========================================
-//  ПРОВЕРКА АВТОРИЗАЦИИ
-// ========================================
 
 async function checkAuth() {
     try {
@@ -51,38 +39,35 @@ async function checkAuth() {
         }
         return result.user || { login: 'Пользователь', role: 'worker' };
     } catch (err) {
-        console.error('Ошибка проверки авторизации:', err);
+        console.error('Auth check error:', err);
         window.location.href = '/login.html';
         return null;
     }
 }
 
-// ========================================
-//  УВЕДОМЛЕНИЯ (TOAST)
-// ========================================
-
 function showToast(message, type = 'info') {
-    // Удаляем старые уведомления
-    const oldContainer = document.getElementById('toastContainer');
-    if (oldContainer) oldContainer.remove();
+    const colors = {
+        success: '#4ade80',
+        error: '#f87171',
+        info: '#c9a959'
+    };
 
-    // Создаём контейнер
+    const existing = document.querySelector('.toast-container');
+    if (existing) existing.remove();
+
     const container = document.createElement('div');
-    container.id = 'toastContainer';
     container.className = 'toast-container';
     document.body.appendChild(container);
 
-    // Создаём уведомление
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
+    toast.style.borderLeftColor = colors[type] || colors.info;
     toast.textContent = message;
-
     container.appendChild(toast);
 
-    // Автоудаление через 3 секунды
     setTimeout(() => {
         toast.style.opacity = '0';
-        toast.style.transform = 'translateY(-10px)';
+        toast.style.transform = 'translateY(20px)';
         setTimeout(() => {
             toast.remove();
             if (container.children.length === 0) container.remove();
@@ -90,22 +75,16 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
-// ========================================
-//  АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПРИ ЗАГРУЗКЕ
-// ========================================
-
-// Если мы на защищённой странице — проверяем авторизацию
-document.addEventListener('DOMContentLoaded', () => {
+// Автоматическая проверка при загрузке защищённых страниц
+document.addEventListener('DOMContentLoaded', async () => {
     const protectedPages = ['/dashboard', '/admin', '/worker'];
     const currentPath = window.location.pathname;
 
     if (protectedPages.some(p => currentPath.startsWith(p))) {
-        checkAuth().then(user => {
-            if (user) {
-                // Показываем имя пользователя
-                const nameEl = document.getElementById('userName');
-                if (nameEl) nameEl.textContent = user.login || 'Пользователь';
-            }
-        });
+        const user = await checkAuth();
+        if (user) {
+            const nameEl = document.getElementById('userName');
+            if (nameEl) nameEl.textContent = user.login || 'Пользователь';
+        }
     }
 });

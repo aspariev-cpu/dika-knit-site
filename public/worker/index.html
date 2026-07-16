@@ -1,0 +1,893 @@
+/**
+ * worker.js — Логика вязальщика (мобильная версия)
+ */
+
+// ========================================
+//  СОСТОЯНИЕ
+// ========================================
+
+let currentCommentTaskId = null;
+
+// ========================================
+//  ИНИЦИАЛИЗАЦИЯ
+// ========================================
+
+document.addEventListener('DOMContentLoaded', async function() {
+    // Проверяем авторизацию
+    const user = await checkAuth();
+    if (!user) return;
+
+    // Показываем имя
+    document.getElementById('userName').textContent = user.login || 'Вязальщик';
+    document.getElementById('userAvatar').textContent = (user.login || 'В')[0].toUpperCase();
+
+    // Загружаем данные
+    await loadWorkerData();
+    await updateSalary();
+
+    // Автообновление каждые 30 секунд
+    setInterval(loadWorkerData, 30000);
+    setInterval(updateSalary, 60000);
+});
+
+// ========================================
+//  ЗАГРУЗКА ДАННЫХ
+// ========================================
+
+async function loadWorkerData() {
+    try {
+        const result = await api.get('/worker/data');
+        if (!result.success) {
+            showToast('Ошибка загрузки данных', 'error');
+            return;
+        }
+
+        const data = result.data;
+        
+        // Обновляем списки
+        renderInProgressShapki(data.inProgressShapki || []);
+        renderInProgressCoat(data.inProgressCoat || []);
+        renderPending(data.pendingShapki || [], data.pendingCoat || []);
+
+        // Обновляем счётчики
+        document.getElementById('countInProgressShapki').textContent = data.inProgressShapki?.length || 0;
+        document.getElementById('countInProgressCoat').textContent = data.inProgressCoat?.length || 0;
+        document.getElementById('countPending').textContent = (data.pendingShapki?.length || 0) + (data.pendingCoat?.length || 0);
+
+        // Загружаем комментарии
+        loadAllComments();
+
+    } catch (err) {
+        console.error('Ошибка загрузки данных вязальщика:', err);
+        showToast('Ошибка загрузки данных', 'error');
+    }
+}
+
+// ========================================
+//  РЕНДЕРИНГ: ШАПКИ В РАБОТЕ
+// ========================================
+
+function renderInProgressShapki(tasks) {
+    const container = document.getElementById('inProgressShapkiList');
+    if (!container) return;
+
+    if (!tasks || tasks.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:#475569;">📭 Нет заданий в работе</div>';
+        return;
+    }
+
+    container.innerHTML = tasks.map(task => {
+        const done = task.doneQuantity || 0;
+        const plan = task.planQuantity || 0;
+        const percent = plan > 0 ? Math.min((done / plan) * 100, 100) : 0;
+        const isCompleted = percent >= 100;
+        const urgent = task.isUrgent ? 'urgent' : '';
+        const modelName = task.Model?.name || '—';
+        const colorName = task.Color?.name || '—';
+        const program = task.Model?.program || '—';
+        const size = task.Model?.size || '—';
+        const yarn = task.Model?.yarn || '—';
+        const ip = task.ip || '—';
+
+        return `
+            <div class="task-card-mobile ${urgent}" data-task-id="${task.id}">
+                <div class="task-title">${task.isUrgent ? '🔥 ' : ''}${modelName}</div>
+                <div class="task-meta">
+                    🎨 <strong>${colorName}</strong>
+                    ${task.color2 ? `| ➕ <strong style="color:#c9a959;">${task.color2.name}</strong>` : ''}
+                    | 📄 <strong>${program}</strong>
+                    | 📏 <strong>${size}</strong>
+                    | 🧵 <strong>${yarn}</strong>
+                    | 🏢 <strong>${ip}</strong>
+                </div>
+
+                <div class="progress-block">
+                    <div class="progress-label">
+                        <span>Прогресс</span>
+                        <span><span class="done">${done}</span> из <span class="plan">${plan}</span> шт. (<span id="percent-${task.id}">${Math.round(percent)}</span>%)</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="fill" id="progress-${task.id}" style="width: ${percent}%;"></div>
+                    </div>
+                </div>
+
+                <!-- Комментарии -->
+                <div class="comments-mobile" id="comments-${task.id}"></div>
+
+                <!-- Действия -->
+                <div class="task-actions-mobile">
+                    <form onsubmit="event.preventDefault(); submitOperation(this)">
+                        <input type="hidden" name="taskId" value="${task.id}">
+                        <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:flex-end;">
+                            <div class="form-group">
+                                <label>Станок</label>
+                                <select name="machineId" required>
+                                    <option value="">Выбрать</option>
+                                    ${Array.from({length: 15}, (_, i) => `<option value="${i+1}">№${i+1}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Кол-во</label>
+                                <input type="number" name="quantity" placeholder="шт." min="1" required style="width:60px;">
+                            </div>
+                            <button type="submit" class="btn-mobile btn-save">💾</button>
+                        </div>
+                    </form>
+                    <button class="btn-mobile btn-print" onclick="printLabel(${task.id})">🖨️</button>
+                    <button class="btn-mobile btn-threading" onclick="openThreadingModal(${task.id})">📐</button>
+                    <button class="btn-mobile btn-undo" onclick="undoOperation(${task.id})">↩️</button>
+                    <button class="btn-mobile btn-comment" onclick="openCommentModal(${task.id})">📝</button>
+                    <button class="btn-mobile btn-return" onclick="returnTask(${task.id})">↩️ Вернуть</button>
+                </div>
+
+                ${isCompleted && task.status !== 'completed' ? `
+                    <button class="btn-send-admin-mobile" onclick="sendToAdmin(${task.id})">📤 Отправить админу</button>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
+
+    // Загружаем сохранённые станки
+    container.querySelectorAll('select[name="machineId"]').forEach((select, index) => {
+        const taskId = tasks[index]?.id;
+        if (taskId) loadMachineSettings(taskId, select);
+    });
+}
+
+// ========================================
+//  РЕНДЕРИНГ: КОФТЫ В РАБОТЕ
+// ========================================
+
+function renderInProgressCoat(tasks) {
+    const container = document.getElementById('inProgressCoatList');
+    if (!container) return;
+
+    if (!tasks || tasks.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:#475569;">📭 Нет кофт в работе</div>';
+        return;
+    }
+
+    container.innerHTML = tasks.map(coat => {
+        const parts = coat.parts || [];
+        let totalDone = 0, totalPlan = 0;
+        parts.forEach(p => {
+            totalDone += Math.min(p.doneQuantity || 0, p.planQuantity || 0);
+            totalPlan += p.planQuantity || 0;
+        });
+        const percent = totalPlan > 0 ? Math.min((totalDone / totalPlan) * 100, 100) : 0;
+        const isCompleted = percent >= 100;
+        const urgent = coat.isUrgent ? 'urgent' : '';
+        const modelName = coat.Model?.name || '—';
+        const colorName = coat.Color?.name || '—';
+        const program = coat.Model?.program || '—';
+        const size = coat.Model?.size || '—';
+        const yarn = coat.Model?.yarn || '—';
+        const ip = coat.ip || '—';
+
+        const partsHtml = parts.map(part => {
+            const partDone = part.doneQuantity || 0;
+            const partPlan = part.planQuantity || 0;
+            const partPercent = partPlan > 0 ? Math.min((partDone / partPlan) * 100, 100) : 0;
+            return `
+                <div class="part-item" data-part-id="${part.id}">
+                    <div class="part-name">${part.partName || 'Деталь'}</div>
+                    <div class="part-progress">
+                        <span>Выполнено: <span class="val" id="part-done-${part.id}">${partDone}</span>/<span id="part-plan-${part.id}">${partPlan}</span></span>
+                        <span id="part-percent-${part.id}">${Math.round(partPercent)}%</span>
+                    </div>
+                    <div class="part-bar">
+                        <div class="fill" id="part-bar-${part.id}" style="width:${partPercent}%;"></div>
+                    </div>
+                    <div class="part-actions">
+                        <form onsubmit="event.preventDefault(); submitOperationPart(this, '${part.id}')" style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
+                            <input type="hidden" name="coatId" value="${coat.id}">
+                            <input type="hidden" name="partId" value="${part.id}">
+                            <select name="machineId" required style="padding:3px 6px; font-size:10px; height:24px; background:rgba(255,255,255,0.08); border:1px solid rgba(201,169,89,0.15); border-radius:4px; color:#fff; min-width:50px;">
+                                <option value="">Ст</option>
+                                ${Array.from({length: 15}, (_, i) => `<option value="${i+1}">${i+1}</option>`).join('')}
+                            </select>
+                            <input type="number" name="quantity" placeholder="шт" min="1" required style="padding:3px 6px; font-size:10px; height:24px; width:45px; background:rgba(255,255,255,0.08); border:1px solid rgba(201,169,89,0.15); border-radius:4px; color:#fff;">
+                            <button type="submit" class="btn-mobile btn-save" style="padding:2px 8px; font-size:10px; height:24px;">💾</button>
+                        </form>
+                        <button class="btn-mobile btn-print" style="padding:2px 8px; font-size:10px; height:24px;" onclick="printPartLabel(${part.id})">🖨️</button>
+                        <button class="btn-mobile btn-threading" style="padding:2px 8px; font-size:10px; height:24px;" onclick="openThreadingModalPart(${part.id})">📐</button>
+                        <button class="btn-mobile btn-undo" style="padding:2px 8px; font-size:10px; height:24px;" onclick="undoOperation(${part.id})">↩️</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        return `
+            <div class="task-card-mobile ${urgent}" data-task-id="${coat.id}">
+                <div class="task-title">${coat.isUrgent ? '🔥 ' : ''}${modelName}</div>
+                <div class="task-meta">
+                    🎨 <strong>${colorName}</strong>
+                    ${coat.color2 ? `| ➕ <strong style="color:#c9a959;">${coat.color2.name}</strong>` : ''}
+                    | 📄 <strong>${program}</strong>
+                    | 📏 <strong>${size}</strong>
+                    | 🧵 <strong>${yarn}</strong>
+                    | 🏢 <strong>${ip}</strong>
+                </div>
+
+                <div class="progress-block">
+                    <div class="progress-label">
+                        <span>Общий прогресс</span>
+                        <span><span class="done">${totalDone}</span> из <span class="plan">${totalPlan}</span> шт. (<span id="coat-percent-${coat.id}">${Math.round(percent)}</span>%)</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="fill" id="coat-progress-${coat.id}" style="width: ${percent}%;"></div>
+                    </div>
+                </div>
+
+                <!-- Комментарии -->
+                <div class="comments-mobile" id="comments-${coat.id}"></div>
+
+                <!-- Детали кофты -->
+                <div class="coat-parts-mobile">
+                    <div class="part-title">🧵 Детали кофты</div>
+                    <div class="part-grid">${partsHtml}</div>
+                </div>
+
+                <!-- Действия -->
+                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;">
+                    <button class="btn-mobile btn-comment" onclick="openCommentModal(${coat.id})">📝 Комментарий</button>
+                    <button class="btn-mobile btn-return" onclick="returnTask(${coat.id})">↩️ Вернуть</button>
+                </div>
+
+                ${isCompleted && coat.status !== 'completed' ? `
+                    <button class="btn-send-admin-mobile" onclick="sendToAdmin(${coat.id})">📤 Отправить админу</button>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
+
+    // Загружаем сохранённые станки для деталей
+    container.querySelectorAll('.part-item select[name="machineId"]').forEach((select, index) => {
+        const partId = tasks.flatMap(t => t.parts || [])[index]?.id;
+        if (partId) loadMachineSettings(partId, select);
+    });
+}
+
+// ========================================
+//  РЕНДЕРИНГ: ОЧЕРЕДЬ
+// ========================================
+
+function renderPending(shapki, coats) {
+    const container = document.getElementById('pendingList');
+    if (!container) return;
+
+    const hasItems = (shapki && shapki.length > 0) || (coats && coats.length > 0);
+    if (!hasItems) {
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:#475569;">🎉 Все заказы взяты в работу!</div>';
+        return;
+    }
+
+    let html = '';
+
+    if (shapki && shapki.length > 0) {
+        html += `<div style="color:#8892b0; font-size:12px; font-weight:600; margin:4px 0 2px 4px;">🧢 Шапки</div>`;
+        shapki.forEach(task => {
+            const urgent = task.isUrgent ? 'urgent' : '';
+            html += `
+                <div class="order-item-mobile ${urgent}">
+                    <div class="info">
+                        <span class="name">${task.isUrgent ? '🔥 ' : ''}${task.Model?.name || '—'}</span>
+                        <span class="badge">📄 ${task.Model?.program || '—'}</span>
+                        <span class="badge">🧵 ${task.Model?.yarn || '—'}</span>
+                        <span class="qty">📦 ${task.planQuantity || 0} шт</span>
+                        <span class="badge">🎨 ${task.Color?.name || '—'}</span>
+                        <span class="badge">🏢 ${task.ip || '—'}</span>
+                    </div>
+                    <div class="actions">
+                        <button class="btn-take-work-mobile" onclick="takeToWork(${task.id})">🔄 В работу</button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    if (coats && coats.length > 0) {
+        html += `<div style="color:#8892b0; font-size:12px; font-weight:600; margin:8px 0 2px 4px;">🧥 Кофты</div>`;
+        coats.forEach(coat => {
+            const urgent = coat.isUrgent ? 'urgent' : '';
+            const partsInfo = (coat.parts || []).map(p => ({ name: p.partName || 'Деталь', qty: p.planQuantity || 0 }));
+            const totalQty = partsInfo.reduce((s, p) => s + p.qty, 0);
+            html += `
+                <div class="order-item-mobile ${urgent}">
+                    <div class="info">
+                        <span class="name">${coat.isUrgent ? '🔥 ' : ''}${coat.Model?.name || '—'}</span>
+                        <span class="badge">📄 ${coat.Model?.program || '—'}</span>
+                        <span class="badge">🧵 ${coat.Model?.yarn || '—'}</span>
+                        <span class="qty">📦 ${totalQty} шт</span>
+                        <span class="badge">🎨 ${coat.Color?.name || '—'}</span>
+                        <span class="badge">🏢 ${coat.ip || '—'}</span>
+                        <span class="badge" style="font-size:10px;">
+                            ${partsInfo.map(p => `<span style="background:rgba(201,169,89,0.1); padding:0 6px; border-radius:4px; margin:0 2px; font-size:9px; color:#c9a959;">${p.name}: ${p.qty}</span>`).join('')}
+                        </span>
+                    </div>
+                    <div class="actions">
+                        <button class="btn-take-work-mobile" onclick="takeToWork(${coat.id})">🔄 В работу</button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    container.innerHTML = html;
+}
+
+// ========================================
+//  ЗАРПЛАТА
+// ========================================
+
+async function updateSalary() {
+    try {
+        const result = await api.get('/salary/current');
+        if (!result.success) return;
+
+        const d = result.data;
+        document.getElementById('salaryShift').textContent = Math.round(d.shift.accrued).toLocaleString() + ' ₽';
+        document.getElementById('salaryTwoWeeks').textContent = Math.round(d.twoWeeks.accrued + d.twoWeeks.carryOver).toLocaleString() + ' ₽';
+        document.getElementById('salaryMonth').textContent = Math.round(d.month.accrued + d.month.carryOver).toLocaleString() + ' ₽';
+        document.getElementById('salaryYear').textContent = Math.round(d.year.accrued + d.year.carryOver).toLocaleString() + ' ₽';
+
+        const shiftMins = d.shift.minutes || 0;
+        const h = Math.floor(shiftMins / 60);
+        const m = shiftMins % 60;
+        document.getElementById('salaryShiftDetails').textContent = h > 0 ? `${h}ч ${m}м` : `${m}м`;
+
+        const formatDate = (date) => new Date(date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+        document.getElementById('salaryTwoWeeksDetails').textContent = `с ${formatDate(d.twoWeeks.start)}`;
+        document.getElementById('salaryMonthDetails').textContent = `с ${formatDate(d.month.start)}`;
+        document.getElementById('salaryYearDetails').textContent = `с ${formatDate(d.year.start)}`;
+    } catch (err) {
+        console.error('Salary error:', err);
+    }
+}
+
+// ========================================
+//  СЕКЦИИ (СВЕРНУТЬ/РАЗВЕРНУТЬ)
+// ========================================
+
+function toggleSection(section) {
+    const body = document.getElementById('body' + section.charAt(0).toUpperCase() + section.slice(1));
+    const toggle = document.getElementById('toggle' + section.charAt(0).toUpperCase() + section.slice(1));
+    if (!body || !toggle) return;
+
+    if (body.classList.contains('hidden')) {
+        body.classList.remove('hidden');
+        toggle.textContent = '−';
+        localStorage.setItem('workerShow' + section, 'true');
+    } else {
+        body.classList.add('hidden');
+        toggle.textContent = '+';
+        localStorage.setItem('workerShow' + section, 'false');
+    }
+}
+
+// Восстанавливаем состояние секций
+document.addEventListener('DOMContentLoaded', function() {
+    ['inProgressShapki', 'inProgressCoat', 'pending'].forEach(section => {
+        const body = document.getElementById('body' + section.charAt(0).toUpperCase() + section.slice(1));
+        const toggle = document.getElementById('toggle' + section.charAt(0).toUpperCase() + section.slice(1));
+        if (body && toggle) {
+            const show = localStorage.getItem('workerShow' + section);
+            if (show === 'false') {
+                body.classList.add('hidden');
+                toggle.textContent = '+';
+            }
+        }
+    });
+});
+
+// ========================================
+//  КОММЕНТАРИИ
+// ========================================
+
+function openCommentModal(taskId) {
+    currentCommentTaskId = taskId;
+    document.getElementById('commentText').value = '';
+    document.getElementById('commentModal').classList.add('active');
+    setTimeout(() => document.getElementById('commentText').focus(), 100);
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+}
+
+async function submitComment() {
+    const text = document.getElementById('commentText').value.trim();
+    if (!text || !currentCommentTaskId) {
+        showToast('Введите текст комментария', 'error');
+        return;
+    }
+    try {
+        const result = await api.post(`/tasks/${currentCommentTaskId}/comment`, { comment: text });
+        if (result.success) {
+            showToast('✅ Комментарий добавлен', 'success');
+            closeModal('commentModal');
+            loadComments(currentCommentTaskId);
+        } else {
+            showToast(result.error || 'Ошибка', 'error');
+        }
+    } catch (err) {
+        console.error('Comment error:', err);
+        showToast('Ошибка добавления комментария', 'error');
+    }
+}
+
+async function loadComments(taskId) {
+    try {
+        const result = await api.get(`/tasks/${taskId}/comments?limit=3`);
+        if (result.success && result.comments.length > 0) {
+            const container = document.getElementById(`comments-${taskId}`);
+            if (container) {
+                container.innerHTML = result.comments.map(c => `
+                    <div class="comment">
+                        <span class="author">${c.User?.fullName || '—'}:</span>
+                        <span class="text">${c.comment}</span>
+                        <span class="time">${new Date(c.createdAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                `).join('');
+                container.style.display = 'block';
+            }
+        }
+    } catch (err) {
+        console.error('Comments load error:', err);
+    }
+}
+
+function loadAllComments() {
+    document.querySelectorAll('.task-card-mobile').forEach(card => {
+        const id = card.dataset.taskId;
+        if (id) loadComments(id);
+    });
+}
+
+// ========================================
+//  ЗАПРАВКА
+// ========================================
+
+function openThreadingModal(taskId) {
+    const card = document.querySelector(`.task-card-mobile[data-task-id="${taskId}"]`);
+    if (!card) return;
+    const threading = card.dataset.threading || '';
+    const modelName = card.querySelector('.task-title')?.textContent?.replace('🔥', '').trim() || 'Модель';
+    showThreadingModal(modelName, threading);
+}
+
+function openThreadingModalPart(partId) {
+    const part = document.querySelector(`.part-item[data-part-id="${partId}"]`);
+    if (!part) return;
+    const threading = part.dataset.threading || '';
+    const name = part.querySelector('.part-name')?.textContent?.trim() || 'Деталь';
+    showThreadingModal(name, threading);
+}
+
+function showThreadingModal(name, threading) {
+    const modal = document.getElementById('threadingModal');
+    const content = document.getElementById('threadingContent');
+    if (!threading || threading.trim() === '') {
+        content.innerHTML = `⚠️ Для <strong>${name}</strong> информация о заправке не указана.`;
+    } else {
+        content.innerHTML = `<strong>${name}</strong>\n\n${threading}`;
+    }
+    modal.classList.add('active');
+}
+
+// Закрытие модалки по клику вне
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal')) {
+        e.target.classList.remove('active');
+    }
+});
+
+// ========================================
+//  НАСТРОЙКИ СТАНКА
+// ========================================
+
+async function loadMachineSettings(taskId, select) {
+    try {
+        const result = await api.get(`/worker/machine-settings/${taskId}`);
+        if (result.success && result.machineId) {
+            select.value = result.machineId;
+        }
+    } catch (err) {
+        console.error('Load machine settings error:', err);
+    }
+}
+
+async function saveMachineSettings(machineId, taskId) {
+    try {
+        await api.post('/worker/machine-settings', { machineId, taskId });
+    } catch (err) {
+        console.error('Save machine settings error:', err);
+    }
+}
+
+// Обработчик изменения станка
+document.addEventListener('change', function(e) {
+    if (e.target && e.target.name === 'machineId') {
+        const machineId = e.target.value;
+        if (!machineId) return;
+
+        const card = e.target.closest('.task-card-mobile');
+        const part = e.target.closest('.part-item');
+        let taskId = null;
+
+        if (part) {
+            taskId = part.dataset.partId;
+        } else if (card) {
+            taskId = card.dataset.taskId;
+        }
+
+        if (taskId) {
+            saveMachineSettings(machineId, taskId);
+        }
+    }
+});
+
+// ========================================
+//  ВЗЯТЬ В РАБОТУ
+// ========================================
+
+async function takeToWork(taskId) {
+    const btn = document.querySelector(`button[onclick="takeToWork(${taskId})"]`);
+    if (btn) { btn.textContent = '⏳...'; btn.disabled = true; }
+
+    try {
+        const result = await api.post(`/tasks/${taskId}/status`, { status: 'in_progress' });
+        if (result.success) {
+            showToast(`✅ Заказ #${taskId} взят в работу!`, 'success');
+            await loadWorkerData();
+        } else {
+            showToast(result.error || 'Ошибка', 'error');
+            if (btn) { btn.textContent = '🔄 В работу'; btn.disabled = false; }
+        }
+    } catch (err) {
+        showToast('Ошибка', 'error');
+        if (btn) { btn.textContent = '🔄 В работу'; btn.disabled = false; }
+    }
+}
+
+// ========================================
+//  ОТПРАВКА ВЫРАБОТКИ
+// ========================================
+
+async function submitOperation(form) {
+    const fd = new FormData(form);
+    const data = {
+        taskId: fd.get('taskId'),
+        machineId: fd.get('machineId'),
+        quantity: fd.get('quantity')
+    };
+
+    if (!data.machineId || !data.quantity || data.quantity < 1) {
+        showToast('Выберите станок и укажите количество', 'error');
+        return;
+    }
+
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+
+    try {
+        const result = await api.post('/operations', data);
+        if (result.success) {
+            const taskId = data.taskId;
+            updateTaskProgress(taskId, result);
+            form.querySelector('input[name="quantity"]').value = '';
+            showToast(`✅ +${data.quantity} шт.`, 'success');
+            await loadWorkerData();
+        } else {
+            showToast(result.error || 'Ошибка', 'error');
+        }
+    } catch (err) {
+        showToast('Ошибка отправки', 'error');
+    }
+
+    if (btn) { btn.textContent = '💾'; btn.disabled = false; }
+}
+
+async function submitOperationPart(form, partId) {
+    const fd = new FormData(form);
+    const data = {
+        taskId: fd.get('coatId'),
+        partId: partId,
+        machineId: fd.get('machineId'),
+        quantity: fd.get('quantity')
+    };
+
+    if (!data.machineId || !data.quantity || data.quantity < 1) {
+        showToast('Выберите станок и укажите количество', 'error');
+        return;
+    }
+
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+
+    try {
+        const result = await api.post('/operations', data);
+        if (result.success) {
+            // Обновляем прогресс детали
+            const partDone = document.getElementById(`part-done-${partId}`);
+            const partPercent = document.getElementById(`part-percent-${partId}`);
+            const partBar = document.getElementById(`part-bar-${partId}`);
+            if (partDone) {
+                const plan = parseInt(document.getElementById(`part-plan-${partId}`)?.textContent || 0);
+                const done = Math.min(result.totalDone || 0, plan);
+                partDone.textContent = done;
+            }
+            if (partPercent) {
+                const plan = parseInt(document.getElementById(`part-plan-${partId}`)?.textContent || 0);
+                const done = Math.min(result.totalDone || 0, plan);
+                partPercent.textContent = plan > 0 ? Math.round((done / plan) * 100) + '%' : '0%';
+            }
+            if (partBar) {
+                const plan = parseInt(document.getElementById(`part-plan-${partId}`)?.textContent || 0);
+                const done = Math.min(result.totalDone || 0, plan);
+                partBar.style.width = plan > 0 ? Math.min((done / plan) * 100, 100) + '%' : '0%';
+            }
+
+            // Обновляем общий прогресс кофты
+            if (result.parentProgress) {
+                updateCoatProgress(data.taskId, result.parentProgress);
+            }
+
+            form.querySelector('input[name="quantity"]').value = '';
+            showToast(`✅ +${data.quantity} шт. для детали`, 'success');
+            await loadWorkerData();
+        } else {
+            showToast(result.error || 'Ошибка', 'error');
+        }
+    } catch (err) {
+        showToast('Ошибка отправки', 'error');
+    }
+
+    if (btn) { btn.textContent = '💾'; btn.disabled = false; }
+}
+
+function updateTaskProgress(taskId, result) {
+    const percentEl = document.getElementById(`percent-${taskId}`);
+    const progressEl = document.getElementById(`progress-${taskId}`);
+    if (percentEl) percentEl.textContent = Math.round(result.percent || 0);
+    if (progressEl) progressEl.style.width = (result.percent || 0) + '%';
+}
+
+function updateCoatProgress(coatId, progress) {
+    const percentEl = document.getElementById(`coat-percent-${coatId}`);
+    const progressEl = document.getElementById(`coat-progress-${coatId}`);
+    if (percentEl) percentEl.textContent = Math.round(progress.percent || 0);
+    if (progressEl) progressEl.style.width = (progress.percent || 0) + '%';
+}
+
+// ========================================
+//  ВЕРНУТЬ В ОЧЕРЕДЬ
+// ========================================
+
+async function returnTask(taskId) {
+    if (!confirm(`↩️ Вернуть заказ #${taskId} в очередь?`)) return;
+
+    try {
+        const result = await api.post(`/tasks/${taskId}/return`);
+        if (result.success) {
+            showToast(`↩️ Заказ #${taskId} возвращён в очередь`, 'info');
+            await loadWorkerData();
+        } else {
+            showToast(result.error || 'Ошибка', 'error');
+        }
+    } catch (err) {
+        showToast('Ошибка', 'error');
+    }
+}
+
+// ========================================
+//  ОТМЕНА ОПЕРАЦИИ
+// ========================================
+
+async function undoOperation(taskId) {
+    if (!confirm(`Отменить последнюю операцию для #${taskId}?`)) return;
+
+    try {
+        const result = await api.post(`/operations/undo/${taskId}`);
+        if (result.success) {
+            showToast('✅ Операция отменена', 'success');
+            await loadWorkerData();
+        } else {
+            showToast(result.error || 'Ошибка', 'error');
+        }
+    } catch (err) {
+        showToast('Ошибка', 'error');
+    }
+}
+
+// ========================================
+//  ОТПРАВИТЬ АДМИНУ
+// ========================================
+
+async function sendToAdmin(taskId) {
+    if (!confirm(`Отправить задание #${taskId} админу?`)) return;
+
+    try {
+        const result = await api.post(`/tasks/complete/${taskId}`);
+        if (result.success) {
+            showToast(`✅ Задание #${taskId} отправлено админу!`, 'success');
+            await loadWorkerData();
+        } else {
+            showToast(result.error || 'Ошибка', 'error');
+        }
+    } catch (err) {
+        showToast('Ошибка', 'error');
+    }
+}
+
+// ========================================
+//  ПЕЧАТЬ
+// ========================================
+
+function printLabel(taskId) {
+    const card = document.querySelector(`.task-card-mobile[data-task-id="${taskId}"]`);
+    if (!card) { showToast('Задание не найдено', 'error'); return; }
+
+    const qtyInput = card.querySelector('input[name="quantity"]');
+    const qty = qtyInput ? qtyInput.value || '0' : '0';
+    if (qty === '0' || qty === '') { showToast('Введите количество', 'error'); return; }
+
+    const model = card.querySelector('.task-title')?.textContent?.replace('🔥', '').trim() || 'Модель';
+    printLabelWithData(taskId, qty, model, null);
+}
+
+function printPartLabel(partId) {
+    const part = document.querySelector(`.part-item[data-part-id="${partId}"]`);
+    if (!part) { showToast('Деталь не найдена', 'error'); return; }
+
+    const qtyInput = part.querySelector('input[name="quantity"]');
+    const qty = qtyInput ? qtyInput.value || '0' : '0';
+    if (qty === '0' || qty === '') { showToast('Введите количество', 'error'); return; }
+
+    const card = part.closest('.task-card-mobile');
+    const model = card?.querySelector('.task-title')?.textContent?.replace('🔥', '').trim() || 'Модель';
+    const partName = part.querySelector('.part-name')?.textContent?.trim() || 'Деталь';
+    printLabelWithData(card?.dataset.taskId || '0', qty, model, partName);
+}
+
+function printLabelWithData(taskId, quantity, modelName, partName) {
+    const card = document.querySelector(`.task-card-mobile[data-task-id="${taskId}"]`);
+    if (!card) return;
+
+    const color = card.querySelector('.task-meta')?.textContent?.match(/🎨\s*([^\|]+)/)?.[1]?.trim() || '—';
+    const program = card.querySelector('.task-meta')?.textContent?.match(/📄\s*([^\|]+)/)?.[1]?.trim() || '—';
+    const size = card.querySelector('.task-meta')?.textContent?.match(/📏\s*([^\|]+)/)?.[1]?.trim() || '—';
+    const yarn = card.querySelector('.task-meta')?.textContent?.match(/🧵\s*([^\|]+)/)?.[1]?.trim() || '—';
+    const ip = card.dataset.ip || '—';
+    const isUrgent = card.classList.contains('urgent');
+    const userName = document.getElementById('userName')?.textContent || 'Вязальщик';
+    const date = new Date().toLocaleDateString('ru-RU');
+
+    const displayName = partName ? `${modelName} (${partName})` : modelName;
+
+    const win = window.open('', '_blank', 'width=400,height=300');
+    if (!win) { showToast('Разрешите всплывающие окна', 'error'); return; }
+
+    win.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Этикетка Dika Knit</title>
+            <style>
+                * { margin:0; padding:0; box-sizing:border-box; }
+                @page { size: 56mm 32mm; margin: 0; }
+                html, body { margin:0; padding:0; width:56mm; height:32mm; background:white; display:flex; justify-content:center; align-items:flex-start; font-family:Arial, sans-serif; }
+                .label { width:56mm; height:32mm; padding:0.2mm 2.5mm 1mm 2.5mm; border:none; display:flex; flex-direction:column; justify-content:flex-start; background:white; }
+                .label .title-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5px; }
+                .label .model { font-size:13px; font-weight:700; color:#000; line-height:1.1; }
+                .label .urgent-badge { font-size:11px; font-weight:900; color:#f87171; white-space:nowrap; margin-left:8px; }
+                .label .quantity { font-size:18px; font-weight:700; color:#c9a959; margin:0px 0 0.5px 0; }
+                .label .info { font-size:9px; color:#333; line-height:1.2; }
+                .label .info span { font-weight:600; color:#000; }
+                .label .color-dot { display:inline-block; width:6px; height:6px; border-radius:50%; vertical-align:middle; margin-right:2px; border:0.5px solid #ccc; }
+                .label .bottom-section { margin-top:auto; border-top:2px solid #c9a959; padding-top:1px; text-align:center; font-size:8px; font-weight:800; color:#c9a959; letter-spacing:0.5px; text-transform:uppercase; }
+                .label .part-badge { display:inline-block; background:#c9a959; color:#000; font-size:7px; font-weight:700; padding:0 5px; border-radius:3px; margin-left:4px; text-transform:uppercase; }
+                @media print { html, body { margin:0; padding:0; width:56mm; height:32mm; } }
+            </style>
+        </head>
+        <body>
+            <div class="label">
+                <div class="title-row">
+                    <div class="model">${displayName} ${partName ? '<span class="part-badge">'+partName+'</span>' : ''}</div>
+                    ${isUrgent ? '<div class="urgent-badge">СРОЧНО</div>' : ''}
+                </div>
+                <div class="quantity">${quantity} шт.</div>
+                <div class="info"><span class="color-dot" style="background:${color};"></span> Цвет: <span>${color}</span> &nbsp;|&nbsp; Пряжа: <span>${yarn}</span></div>
+                <div class="info">Программа: <span>${program}</span> &nbsp;|&nbsp; Размер: <span>${size}</span></div>
+                <div class="info">ИП: <span>${ip}</span> &nbsp;|&nbsp; Вязал: <span>${userName}</span> &nbsp;|&nbsp; ${date}</div>
+                <div class="bottom-section">Dika Knit</div>
+            </div>
+            <script>
+                window.onload = function() {
+                    setTimeout(function() { window.print(); setTimeout(function() { window.close(); }, 500); }, 500);
+                };
+            <\/script>
+        </body>
+        </html>
+    `);
+    win.document.close();
+}
+
+// ========================================
+//  УВЕДОМЛЕНИЯ
+// ========================================
+
+function showToast(message, type = 'info') {
+    const colors = { success: '#4ade80', error: '#f87171', info: '#c9a959' };
+
+    const existing = document.querySelector('.toast-mobile');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'toast-mobile';
+    toast.style.cssText = `
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+        z-index: 9999; width: 90%; max-width: 400px;
+        background: rgba(10,14,26,0.95); backdrop-filter: blur(10px);
+        padding: 12px 18px; border-radius: 12px;
+        border-left: 4px solid ${colors[type] || colors.info};
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        color: #fff; font-size: 14px; font-weight: 500;
+        text-align: center;
+        animation: slideUp 0.4s ease;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-50%) translateY(20px)';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Добавляем анимацию
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+        to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+`;
+document.head.appendChild(styleSheet);
+
+// ========================================
+//  API-ОБЁРТКИ ДЛЯ ВЯЗАЛЬЩИКА
+// ========================================
+
+api.get = async function(endpoint) {
+    return await this.request('/api' + endpoint);
+};
+
+api.post = async function(endpoint, data) {
+    return await this.request('/api' + endpoint, {
+        method: 'POST',
+        body: JSON.stringify(data)
+    });
+};

@@ -15,147 +15,55 @@
                 <h1>Dika Knit</h1>
                 <p>Мобильная версия</p>
             </div>
-            
+
             <form id="loginForm" class="auth-form">
                 <div class="form-group">
                     <label for="login">Логин</label>
                     <input type="text" id="login" placeholder="Введите логин" value="admin" required>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="password">Пароль</label>
                     <input type="password" id="password" placeholder="Введите пароль" value="admin123" required>
                 </div>
-                
+
                 <button type="submit" class="btn-auth">Войти</button>
-                
+
                 <div id="authError" class="auth-error" style="display: none;"></div>
             </form>
-            
+
             <div class="auth-footer">
                 <p>Dika Knit Production System v1.0</p>
             </div>
         </div>
     </div>
-    
+
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
     <script>
-        // ========================================
-        //  API КЛИЕНТ
-        // ========================================
-        
-        const API_BASE = window.location.origin;
-        
-        class ApiClient {
-            constructor() {
-                this.token = localStorage.getItem('token');
-                console.log('🔑 ApiClient готов');
-            }
-        
-            setToken(token) {
-                this.token = token;
-                localStorage.setItem('token', token);
-            }
-        
-            clearToken() {
-                this.token = null;
-                localStorage.removeItem('token');
-            }
-        
-            async request(endpoint, options = {}) {
-                const headers = {
-                    'Content-Type': 'application/json',
-                    ...options.headers
-                };
-        
-                if (this.token) {
-                    headers['Authorization'] = `Bearer ${this.token}`;
-                }
-        
-                const response = await fetch(`${API_BASE}${endpoint}`, {
-                    ...options,
-                    headers
-                });
-        
-                if (response.status === 401) {
-                    this.clearToken();
-                    window.location.href = '/login.html';
-                    throw new Error('Сессия истекла');
-                }
-        
-                return await response.json();
-            }
-        
-            async login(login, password) {
-                const result = await this.request('/api/auth/login', {
-                    method: 'POST',
-                    body: JSON.stringify({ login, password })
-                });
-        
-                if (result.success && result.token) {
-                    this.setToken(result.token);
-                }
-        
-                return result;
-            }
-        
-            async verify() {
-                return await this.request('/api/auth/verify', {
-                    method: 'POST',
-                    body: JSON.stringify({ token: this.token })
-                });
-            }
-        
-            async getMachines() { return await this.request('/api/machines'); }
-            async getTasks() { return await this.request('/api/tasks'); }
-            async getSalary() { return await this.request('/api/salary'); }
-            async getStats() { return await this.request('/api/stats'); }
-            
-            async sendCommand(action, args = []) {
-                return await this.request(`/api/command/${action}`, {
-                    method: 'POST',
-                    body: JSON.stringify({ args })
-                });
-            }
-        }
-        
-        const api = new ApiClient();
-        console.log('✅ API создан');
-        
-        // ========================================
-        //  ОБРАБОТЧИК ФОРМЫ
-        // ========================================
-        
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             const login = document.getElementById('login').value;
             const password = document.getElementById('password').value;
             const errorEl = document.getElementById('authError');
-            
+
             errorEl.style.display = 'none';
-            
-            try {
-                const result = await api.login(login, password);
-                
-                if (result.success) {
-                    window.location.href = '/dashboard';
-                } else {
-                    errorEl.textContent = result.error || 'Ошибка входа';
-                    errorEl.style.display = 'block';
-                }
-            } catch (err) {
-                errorEl.textContent = '❌ Ошибка соединения с сервером';
+
+            const result = await loginUser(login, password);
+
+            if (!result.success) {
+                errorEl.textContent = result.error || 'Ошибка входа';
                 errorEl.style.display = 'block';
             }
         });
-        
-        // Проверяем, есть ли уже токен
+
+        // Если уже есть токен — перенаправляем
         if (api.token) {
-            api.verify().then(result => {
-                if (result.success) {
-                    window.location.href = '/dashboard';
-                }
-            });
+            const result = await api.verify();
+            if (result.success) {
+                window.location.href = '/dashboard';
+            }
         }
     </script>
 </body>
