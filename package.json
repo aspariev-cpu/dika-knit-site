@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "DEBUG=true nodemon server.js",
-    "test": "node -e \"console.log('✅ Все работает!')\""
+    "test": "node -e \"console.log('✅ Все работает!')\"",
+    "build": "bash .render-build.sh"
   },
   "dependencies": {
     "axios": "^1.6.2",
