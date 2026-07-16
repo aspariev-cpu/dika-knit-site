@@ -12,7 +12,8 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dika-mobile-secret-2024';
 const MOBILE_SECRET_KEY = process.env.MOBILE_SECRET_KEY || 'DikaKnitMobile2024SecureKey';
 const WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
-const COMMANDS_CHANNEL = process.env.MOBILE_COMMANDS_CHANNEL;
+const NOTIFICATIONS_CHANNEL = process.env.MOBILE_NOTIFICATIONS_CHANNEL;
+const BOT_TOKEN = process.env.MOBILE_BRIDGE_TOKEN;
 
 // ========================================
 //  TRUST PROXY
@@ -29,29 +30,15 @@ const limiter = rateLimit({
     max: 30,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => {
-        return req.ip || req.connection?.remoteAddress || 'unknown';
-    },
-    handler: (req, res) => {
-        res.status(429).json({
-            error: 'Слишком много запросов. Попробуйте позже.',
-            retryAfter: Math.ceil(req.rateLimit.resetTime / 1000)
-        });
-    }
+    keyGenerator: (req) => req.ip || req.connection?.remoteAddress || 'unknown'
 });
 
 // ========================================
 //  MIDDLEWARE
 // ========================================
 
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'] }));
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api', limiter);
 
@@ -59,11 +46,7 @@ app.use('/api', limiter);
 //  КЭШ
 // ========================================
 
-const cache = new NodeCache({
-    stdTTL: 60,
-    checkperiod: 10,
-    useClones: false
-});
+const cache = new NodeCache({ stdTTL: 60, checkperiod: 10 });
 
 // ========================================
 //  МОК-ДАННЫЕ (запасной вариант)
@@ -75,28 +58,82 @@ function getMockData(type) {
             machines: Array.from({ length: 15 }, (_, i) => ({
                 id: i + 1,
                 number: i + 1,
-                isRunning: Math.random() > 0.3,
-                hasHelper: Math.random() > 0.5,
-                workedMinutes: Math.floor(Math.random() * 500)
+                isRunning: false,
+                hasHelper: false,
+                workedMinutes: 0
             })),
-            activeCount: Math.floor(Math.random() * 10) + 3
+            activeCount: 0
         },
         tasks: {
-            inProgress: [
-                { id: 125, model: 'Поло XL', color: 'Белый', done: 45, plan: 50, urgent: true },
-                { id: 128, model: 'Воротник', color: 'Красный', done: 30, plan: 30, urgent: false }
-            ],
-            pending: [
-                { id: 129, model: 'Полка', color: 'Желтый', plan: 40, urgent: false }
-            ],
-            completed: [
-                { id: 124, model: 'Рукава', color: 'Синий', plan: 60 }
-            ]
+            inProgress: [],
+            pending: [],
+            completed: []
         },
-        salary: { shift: 750, twoWeeks: 8450, month: 16200, year: 194400 },
-        stats: { totalToday: 145, activeTasks: 8, activeMachines: 12, totalMachines: 15, urgentTasks: 2 }
+        salary: { shift: 0, twoWeeks: 0, month: 0, year: 0 },
+        stats: { totalToday: 0, activeTasks: 0, activeMachines: 0, totalMachines: 15, urgentTasks: 0 }
     };
     return data[type] || {};
+}
+
+// ========================================
+//  ПАРСИНГ ОТВЕТА ИЗ DISCORD
+// ========================================
+
+function parseMachinesResponse(content) {
+    const machines = [];
+    const lines = content.split('\n');
+    let activeCount = 0;
+
+    for (const line of lines) {
+        // Ищем строки вида: "🟢 Станок №1 — Работает ⏱️ 3ч 15м | 👤 ✅ Срез."
+        const match = line.match(/Станок №(\d+)\s*[—\-]\s*(Работает|Простаивает)/);
+        if (match) {
+            const number = parseInt(match[1]);
+            const isRunning = match[2] === 'Работает';
+            
+            // Ищем время
+            const timeMatch = line.match(/⏱️\s*(\d+)ч\s*(\d+)м/);
+            const workedMinutes = timeMatch ? parseInt(timeMatch[1]) * 60 + parseInt(timeMatch[2]) : 0;
+            
+            // Ищем срезальщицу
+            const hasHelper = line.includes('✅ Срез.');
+            
+            machines.push({ id: number, number, isRunning, hasHelper, workedMinutes });
+            if (isRunning) activeCount++;
+        }
+    }
+
+    // Если не удалось распарсить — возвращаем пустой массив
+    if (machines.length === 0) {
+        return getMockData('machines');
+    }
+
+    return { machines, activeCount };
+}
+
+function parseTasksResponse(content) {
+    // TODO: парсинг заданий из Discord
+    return getMockData('tasks');
+}
+
+function parseSalaryResponse(content) {
+    // TODO: парсинг зарплаты из Discord
+    return getMockData('salary');
+}
+
+function parseStatsResponse(content) {
+    // TODO: парсинг статистики из Discord
+    return getMockData('stats');
+}
+
+function parseDiscordResponse(content, type) {
+    switch (type) {
+        case 'machines': return parseMachinesResponse(content);
+        case 'tasks': return parseTasksResponse(content);
+        case 'salary': return parseSalaryResponse(content);
+        case 'stats': return parseStatsResponse(content);
+        default: return getMockData(type);
+    }
 }
 
 // ========================================
@@ -105,8 +142,8 @@ function getMockData(type) {
 
 async function sendDiscordCommand(command, args = []) {
     if (!WEBHOOK_URL) {
-        console.warn('⚠️ Webhook не настроен, используем заглушку');
-        return null;
+        console.warn('⚠️ Webhook не настроен');
+        return false;
     }
 
     try {
@@ -115,7 +152,37 @@ async function sendDiscordCommand(command, args = []) {
         console.log(`✅ Команда отправлена: ${fullCommand}`);
         return true;
     } catch (err) {
-        console.error('❌ Ошибка отправки команды:', err.message);
+        console.error('❌ Ошибка отправки:', err.message);
+        return false;
+    }
+}
+
+// ========================================
+//  ЧТЕНИЕ ОТВЕТА ИЗ DISCORD
+// ========================================
+
+async function readDiscordResponse() {
+    if (!NOTIFICATIONS_CHANNEL || !BOT_TOKEN) {
+        console.warn('⚠️ Нет настроек для чтения Discord');
+        return null;
+    }
+
+    try {
+        const response = await axios.get(
+            `https://discord.com/api/v10/channels/${NOTIFICATIONS_CHANNEL}/messages?limit=5`,
+            {
+                headers: { 'Authorization': `Bot ${BOT_TOKEN}` }
+            }
+        );
+
+        const messages = response.data || [];
+        const botMessages = messages.filter(m => m.author.bot);
+        
+        if (botMessages.length === 0) return null;
+        
+        return botMessages[0].content;
+    } catch (err) {
+        console.error('❌ Ошибка чтения Discord:', err.message);
         return null;
     }
 }
@@ -129,7 +196,6 @@ app.get('/api/health', (req, res) => {
     res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
-        cache: cache.getStats(),
         uptime: process.uptime()
     });
 });
@@ -153,12 +219,7 @@ app.post('/api/auth/login', async (req, res) => {
             { expiresIn: '7d' }
         );
         
-        return res.json({
-            success: true,
-            token,
-            message: '✅ Вход выполнен'
-        });
-        
+        return res.json({ success: true, token, message: '✅ Вход выполнен' });
     } catch (err) {
         console.error('Ошибка входа:', err);
         res.status(500).json({ error: 'Внутренняя ошибка сервера' });
@@ -180,7 +241,7 @@ app.post('/api/auth/verify', (req, res) => {
 });
 
 // ========================================
-//  ПОЛУЧЕНИЕ ДАННЫХ (С РЕАЛЬНЫМИ ЗАПРОСАМИ)
+//  ПОЛУЧЕНИЕ ДАННЫХ
 // ========================================
 
 app.get('/api/:type', async (req, res) => {
@@ -197,18 +258,33 @@ app.get('/api/:type', async (req, res) => {
         return res.json({ success: true, data: cached, cached: true });
     }
 
-    // Отправляем запрос в Discord
+    // Отправляем команду в Discord
     const sent = await sendDiscordCommand(type);
     
-    // Пока используем заглушку (в будущем — парсим ответ из Discord)
-    const data = getMockData(type);
+    // Ждём ответ (3 секунды)
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    // Читаем ответ из Discord
+    const discordResponse = await readDiscordResponse();
+    
+    let data;
+    if (discordResponse) {
+        console.log(`📦 Получен ответ для /${type}: ${discordResponse.substring(0, 100)}...`);
+        data = parseDiscordResponse(discordResponse, type);
+    } else {
+        // Если нет ответа — используем заглушку
+        data = getMockData(type);
+    }
+    
+    // Сохраняем в кэш
     cache.set(type, data);
     
     res.json({ 
         success: true, 
         data, 
         cached: false,
-        discord: sent ? '✅ команда отправлена' : '❌ Webhook не настроен'
+        source: discordResponse ? 'Discord' : 'Mock',
+        timestamp: new Date().toISOString()
     });
 });
 
@@ -288,8 +364,9 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('🚀 Dika Knit Mobile v1.0');
     console.log('=================================');
     console.log(`📍 URL: http://localhost:${PORT}`);
-    console.log(`🔐 JWT Secret: ${JWT_SECRET.substring(0, 10)}...`);
     console.log(`📡 Webhook: ${WEBHOOK_URL ? '✅' : '❌'}`);
+    console.log(`📡 Канал уведомлений: ${NOTIFICATIONS_CHANNEL ? '✅' : '❌'}`);
+    console.log(`📡 Токен бота: ${BOT_TOKEN ? '✅' : '❌'}`);
     console.log('=================================');
     console.log('✅ Сервер готов к работе!\n');
 });
@@ -302,14 +379,6 @@ process.on('SIGTERM', () => {
             process.exit(0);
         });
     }, 3000);
-});
-
-process.on('unhandledRejection', (err) => {
-    console.error('Unhandled Rejection:', err);
-});
-
-process.on('uncaughtException', (err) => {
-    console.error('Uncaught Exception:', err);
 });
 
 module.exports = app;
