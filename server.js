@@ -257,23 +257,49 @@ function getMockData(type) {
 
 // Универсальный эндпоинт для получения данных
 app.get('/api/:type', async (req, res) => {
+    const { type } = req.params;
+    const valid = ['machines', 'tasks', 'salary', 'stats'];
+    
+    if (!valid.includes(type)) {
+        return res.status(404).json({ error: 'Неизвестный тип данных' });
+    }
+
+    // Проверяем кэш
+    const cached = cache.get(type);
+    if (cached) {
+        return res.json({ success: true, data: cached, cached: true });
+    }
+
     try {
-        const { type } = req.params;
-        const validTypes = ['machines', 'tasks', 'salary', 'stats'];
-        
-        if (!validTypes.includes(type)) {
-            return res.status(404).json({ error: 'Неизвестный тип данных' });
+        // Отправляем команду в Discord через Webhook
+        const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+        if (!webhookUrl) {
+            // Если Webhook не настроен — используем заглушку
+            const data = getMockData(type);
+            cache.set(type, data);
+            return res.json({ success: true, data, cached: false });
         }
 
-        // Проверяем кэш
-        const cached = cache.get(type);
-        if (cached) {
-            return res.json({ 
-                success: true, 
-                data: cached, 
-                cached: true,
-                timestamp: new Date().toISOString()
-            });
+        // Формируем команду
+        const command = `/${type} ${MOBILE_SECRET_KEY}`;
+        
+        // Отправляем в Discord
+        await axios.post(webhookUrl, { content: command });
+        
+        // Ждём ответ (пока что используем заглушку, т.к. ответ приходит асинхронно)
+        // В будущем здесь будет чтение из канала
+        const data = getMockData(type);
+        cache.set(type, data);
+        
+        res.json({ success: true, data, cached: false });
+    } catch (err) {
+        console.error('Ошибка получения данных:', err);
+        // В случае ошибки — возвращаем заглушку
+        const data = getMockData(type);
+        cache.set(type, data);
+        res.json({ success: true, data, cached: false });
+    }
+});
         }
 
         // Пытаемся получить данные через Discord
