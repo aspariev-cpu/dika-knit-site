@@ -22,7 +22,6 @@
     </header>
     
     <main class="mobile-main">
-        <!-- Статистика -->
         <section class="stats-grid" id="statsGrid">
             <div class="stat-card">
                 <div class="stat-icon">🧵</div>
@@ -46,7 +45,6 @@
             </div>
         </section>
         
-        <!-- Навигация -->
         <nav class="mobile-nav">
             <a href="/worker" class="nav-card">
                 <span class="nav-icon">🖥️</span>
@@ -66,7 +64,6 @@
             </a>
         </nav>
         
-        <!-- Активные задания -->
         <section class="tasks-section">
             <div class="section-header">
                 <h2>Активные задания</h2>
@@ -77,7 +74,6 @@
             </div>
         </section>
         
-        <!-- Станки -->
         <section class="machines-section">
             <div class="section-header">
                 <h2>Станки</h2>
@@ -89,8 +85,229 @@
         </section>
     </main>
     
-    <script src="/js/api.js"></script>
-    <script src="/js/auth.js"></script>
-    <script src="/js/app.js"></script>
+    <script>
+        // ========================================
+        //  API КЛИЕНТ
+        // ========================================
+        
+        const API_BASE = window.location.origin;
+        
+        class ApiClient {
+            constructor() {
+                this.token = localStorage.getItem('token');
+                console.log('🔑 ApiClient готов');
+            }
+        
+            setToken(token) {
+                this.token = token;
+                localStorage.setItem('token', token);
+            }
+        
+            clearToken() {
+                this.token = null;
+                localStorage.removeItem('token');
+            }
+        
+            async request(endpoint, options = {}) {
+                const headers = {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                };
+        
+                if (this.token) {
+                    headers['Authorization'] = `Bearer ${this.token}`;
+                }
+        
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    ...options,
+                    headers
+                });
+        
+                if (response.status === 401) {
+                    this.clearToken();
+                    window.location.href = '/login.html';
+                    throw new Error('Сессия истекла');
+                }
+        
+                return await response.json();
+            }
+        
+            async login(login, password) {
+                const result = await this.request('/api/auth/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ login, password })
+                });
+                if (result.success && result.token) this.setToken(result.token);
+                return result;
+            }
+        
+            async verify() {
+                return await this.request('/api/auth/verify', {
+                    method: 'POST',
+                    body: JSON.stringify({ token: this.token })
+                });
+            }
+        
+            async getMachines() { return await this.request('/api/machines'); }
+            async getTasks() { return await this.request('/api/tasks'); }
+            async getSalary() { return await this.request('/api/salary'); }
+            async getStats() { return await this.request('/api/stats'); }
+            
+            async sendCommand(action, args = []) {
+                return await this.request(`/api/command/${action}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ args })
+                });
+            }
+        }
+        
+        const api = new ApiClient();
+        console.log('✅ API создан');
+        
+        // ========================================
+        //  ФУНКЦИИ
+        // ========================================
+        
+        function showToast(message, type = 'info') {
+            const old = document.getElementById('toastContainer');
+            if (old) old.remove();
+            
+            const container = document.createElement('div');
+            container.id = 'toastContainer';
+            container.className = 'toast-container';
+            document.body.appendChild(container);
+            
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => { toast.remove(); if (!container.children.length) container.remove(); }, 300);
+            }, 3000);
+        }
+        
+        async function logout() {
+            api.clearToken();
+            showToast('👋 Вы вышли', 'info');
+            setTimeout(() => window.location.href = '/login.html', 500);
+        }
+        
+        async function loadStats() {
+            try {
+                const r = await api.getStats();
+                if (r.success) {
+                    const d = r.data || {};
+                    document.getElementById('statToday').textContent = d.totalToday || '--';
+                    document.getElementById('statTasks').textContent = d.activeTasks || '--';
+                    document.getElementById('statMachines').textContent = 
+                        `${d.activeMachines || 0}/${d.totalMachines || 15}`;
+                    document.getElementById('statUrgent').textContent = d.urgentTasks || '--';
+                }
+            } catch (e) { console.error('Stats error:', e); }
+        }
+        
+        async function loadTasks() {
+            const el = document.getElementById('tasksList');
+            try {
+                const r = await api.getTasks();
+                if (!r.success) { el.innerHTML = `<div class="error">❌ ${r.error || 'Ошибка'}</div>`; return; }
+                
+                const tasks = [...(r.data?.inProgress || []), ...(r.data?.pending || [])];
+                if (!tasks.length) { el.innerHTML = `<div class="empty">📭 Нет активных заданий</div>`; return; }
+                
+                el.innerHTML = tasks.slice(0, 5).map(t => {
+                    const p = t.plan > 0 ? Math.round((t.done / t.plan) * 100) : 0;
+                    return `
+                        <div class="task-item ${t.urgent ? 'urgent' : ''}">
+                            <div class="task-info">
+                                <div><span class="task-id">#${t.id}</span> <span class="task-model">${t.model || '—'}</span> ${t.urgent ? '🔥' : ''}</div>
+                                <div class="task-meta">${t.color || '—'} · ${t.done || 0}/${t.plan || 0} шт</div>
+                            </div>
+                            <div class="task-progress">
+                                <div class="task-bar"><div class="fill" style="width: ${Math.min(p, 100)}%"></div></div>
+                                <span class="task-percent">${p}%</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                document.getElementById('tasksCount').textContent = tasks.length;
+            } catch (e) { el.innerHTML = `<div class="error">❌ Ошибка</div>`; }
+        }
+        
+        async function loadMachines() {
+            const el = document.getElementById('machinesGrid');
+            try {
+                const r = await api.getMachines();
+                if (!r.success) { el.innerHTML = `<div class="error">❌ ${r.error || 'Ошибка'}</div>`; return; }
+                
+                const machines = r.data?.machines || [];
+                if (!machines.length) { el.innerHTML = `<div class="empty">🖥️ Нет данных</div>`; return; }
+                
+                el.innerHTML = machines.map(m => {
+                    const s = m.isRunning ? '🟢' : '⚪';
+                    const h = Math.floor((m.workedMinutes || 0) / 60);
+                    const mn = (m.workedMinutes || 0) % 60;
+                    return `
+                        <div class="machine-card">
+                            <div class="machine-number">№${m.number || m.id}</div>
+                            <div class="machine-status">${s}</div>
+                            ${m.isRunning ? `<div class="machine-time">⏱️ ${h > 0 ? h + 'ч ' + mn + 'м' : mn + 'м'}</div>` : ''}
+                            <div class="machine-helper">👤 ${m.hasHelper ? '✅' : '❌'}</div>
+                            <div class="machine-actions">
+                                ${m.isRunning 
+                                    ? `<button class="btn-stop" onclick="stopMachine(${m.number || m.id})">⏹</button>`
+                                    : `<button class="btn-start" onclick="startMachine(${m.number || m.id})">▶</button>`
+                                }
+                                <button class="btn-helper ${m.hasHelper ? 'active' : ''}" onclick="toggleHelper(${m.number || m.id})">👤</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                const active = machines.filter(m => m.isRunning).length;
+                document.getElementById('machinesCount').textContent = `${active}/${machines.length}`;
+            } catch (e) { el.innerHTML = `<div class="error">❌ Ошибка</div>`; }
+        }
+        
+        async function startMachine(n) {
+            const r = await api.sendCommand('start', [n]);
+            if (r.success) { showToast(`✅ Станок №${n} запущен`, 'success'); loadMachines(); }
+            else showToast(r.error || '❌ Ошибка', 'error');
+        }
+        
+        async function stopMachine(n) {
+            const r = await api.sendCommand('stop', [n]);
+            if (r.success) { showToast(`⏹️ Станок №${n} остановлен`, 'info'); loadMachines(); }
+            else showToast(r.error || '❌ Ошибка', 'error');
+        }
+        
+        async function toggleHelper(n) {
+            const state = 'on';
+            const r = await api.sendCommand('helper', [n, state]);
+            if (r.success) { showToast(`👤 Срезальщица включена`, 'info'); loadMachines(); }
+            else showToast(r.error || '❌ Ошибка', 'error');
+        }
+        
+        // ========================================
+        //  ИНИЦИАЛИЗАЦИЯ
+        // ========================================
+        
+        async function init() {
+            try {
+                const r = await api.verify();
+                if (!r.success) { window.location.href = '/login.html'; return; }
+                document.getElementById('userName').textContent = r.user?.login || 'Пользователь';
+                await Promise.all([loadStats(), loadTasks(), loadMachines()]);
+            } catch (e) { window.location.href = '/login.html'; }
+        }
+        
+        init();
+        setInterval(() => { 
+            if (window.location.pathname === '/dashboard') {
+                loadStats(); loadTasks(); loadMachines();
+            }
+        }, 30000);
+    </script>
 </body>
 </html>
