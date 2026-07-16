@@ -22,6 +22,7 @@
     </header>
     
     <main class="mobile-main">
+        <!-- Статистика -->
         <section class="stats-grid" id="statsGrid">
             <div class="stat-card">
                 <div class="stat-icon">🧵</div>
@@ -45,6 +46,7 @@
             </div>
         </section>
         
+        <!-- Навигация -->
         <nav class="mobile-nav">
             <a href="/worker" class="nav-card">
                 <span class="nav-icon">🖥️</span>
@@ -64,6 +66,7 @@
             </a>
         </nav>
         
+        <!-- Активные задания -->
         <section class="tasks-section">
             <div class="section-header">
                 <h2>Активные задания</h2>
@@ -74,6 +77,7 @@
             </div>
         </section>
         
+        <!-- Станки -->
         <section class="machines-section">
             <div class="section-header">
                 <h2>Станки</h2>
@@ -113,22 +117,15 @@
                     'Content-Type': 'application/json',
                     ...options.headers
                 };
-        
                 if (this.token) {
                     headers['Authorization'] = `Bearer ${this.token}`;
                 }
-        
-                const response = await fetch(`${API_BASE}${endpoint}`, {
-                    ...options,
-                    headers
-                });
-        
+                const response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
                 if (response.status === 401) {
                     this.clearToken();
                     window.location.href = '/login.html';
                     throw new Error('Сессия истекла');
                 }
-        
                 return await response.json();
             }
         
@@ -162,10 +159,9 @@
         }
         
         const api = new ApiClient();
-        console.log('✅ API создан');
         
         // ========================================
-        //  ФУНКЦИИ
+        //  УВЕДОМЛЕНИЯ
         // ========================================
         
         function showToast(message, type = 'info') {
@@ -188,11 +184,19 @@
             }, 3000);
         }
         
+        // ========================================
+        //  ВЫХОД
+        // ========================================
+        
         async function logout() {
             api.clearToken();
             showToast('👋 Вы вышли', 'info');
             setTimeout(() => window.location.href = '/login.html', 500);
         }
+        
+        // ========================================
+        //  ЗАГРУЗКА ДАННЫХ
+        // ========================================
         
         async function loadStats() {
             try {
@@ -217,17 +221,25 @@
                 const tasks = [...(r.data?.inProgress || []), ...(r.data?.pending || [])];
                 if (!tasks.length) { el.innerHTML = `<div class="empty">📭 Нет активных заданий</div>`; return; }
                 
-                el.innerHTML = tasks.slice(0, 5).map(t => {
+                el.innerHTML = tasks.map(t => {
                     const p = t.plan > 0 ? Math.round((t.done / t.plan) * 100) : 0;
                     return `
                         <div class="task-item ${t.urgent ? 'urgent' : ''}">
                             <div class="task-info">
-                                <div><span class="task-id">#${t.id}</span> <span class="task-model">${t.model || '—'}</span> ${t.urgent ? '🔥' : ''}</div>
+                                <div>
+                                    <span class="task-id">#${t.id}</span>
+                                    <span class="task-model">${t.model || '—'}</span>
+                                    ${t.urgent ? '🔥' : ''}
+                                </div>
                                 <div class="task-meta">${t.color || '—'} · ${t.done || 0}/${t.plan || 0} шт</div>
                             </div>
                             <div class="task-progress">
                                 <div class="task-bar"><div class="fill" style="width: ${Math.min(p, 100)}%"></div></div>
                                 <span class="task-percent">${p}%</span>
+                            </div>
+                            <div class="task-actions">
+                                <button class="btn btn-success" onclick="completeTask(${t.id})">✅ Завершить</button>
+                                <button class="btn btn-secondary" onclick="returnTask(${t.id})">↩️ Вернуть</button>
                             </div>
                         </div>
                     `;
@@ -246,47 +258,123 @@
                 if (!machines.length) { el.innerHTML = `<div class="empty">🖥️ Нет данных</div>`; return; }
                 
                 el.innerHTML = machines.map(m => {
-                    const s = m.isRunning ? '🟢' : '⚪';
-                    const h = Math.floor((m.workedMinutes || 0) / 60);
-                    const mn = (m.workedMinutes || 0) % 60;
+                    const statusIcon = m.isRunning ? '🟢' : '⚪';
+                    const statusText = m.isRunning ? 'Работает' : 'Простаивает';
+                    const hours = Math.floor((m.workedMinutes || 0) / 60);
+                    const mins = (m.workedMinutes || 0) % 60;
+                    const timeStr = m.isRunning ? `⏱️ ${hours > 0 ? hours + 'ч ' + mins + 'м' : mins + 'м'}` : '';
+                    
                     return `
-                        <div class="machine-card">
-                            <div class="machine-number">№${m.number || m.id}</div>
-                            <div class="machine-status">${s}</div>
-                            ${m.isRunning ? `<div class="machine-time">⏱️ ${h > 0 ? h + 'ч ' + mn + 'м' : mn + 'м'}</div>` : ''}
-                            <div class="machine-helper">👤 ${m.hasHelper ? '✅' : '❌'}</div>
+                        <div class="machine-card" data-machine="${m.number}">
+                            <div class="machine-number">№${m.number}</div>
+                            <div class="machine-status">${statusIcon}</div>
+                            <div class="machine-status-text">${statusText}</div>
+                            ${timeStr ? `<div class="machine-time">${timeStr}</div>` : ''}
+                            <div class="machine-helper">👤 ${m.hasHelper ? '✅ Срез.' : '❌ Без срез.'}</div>
                             <div class="machine-actions">
                                 ${m.isRunning 
-                                    ? `<button class="btn-stop" onclick="stopMachine(${m.number || m.id})">⏹</button>`
-                                    : `<button class="btn-start" onclick="startMachine(${m.number || m.id})">▶</button>`
+                                    ? `<button class="btn-stop" onclick="stopMachine(${m.number})">⏹ СТОП</button>`
+                                    : `<button class="btn-start" onclick="startMachine(${m.number})">▶ СТАРТ</button>`
                                 }
-                                <button class="btn-helper ${m.hasHelper ? 'active' : ''}" onclick="toggleHelper(${m.number || m.id})">👤</button>
+                                <button class="btn-helper ${m.hasHelper ? 'active' : ''}" 
+                                        onclick="toggleHelper(${m.number})">
+                                    👤 ${m.hasHelper ? 'Вкл' : 'Выкл'}
+                                </button>
                             </div>
                         </div>
                     `;
                 }).join('');
+                
                 const active = machines.filter(m => m.isRunning).length;
                 document.getElementById('machinesCount').textContent = `${active}/${machines.length}`;
             } catch (e) { el.innerHTML = `<div class="error">❌ Ошибка</div>`; }
         }
         
-        async function startMachine(n) {
-            const r = await api.sendCommand('start', [n]);
-            if (r.success) { showToast(`✅ Станок №${n} запущен`, 'success'); loadMachines(); }
-            else showToast(r.error || '❌ Ошибка', 'error');
+        // ========================================
+        //  ДЕЙСТВИЯ
+        // ========================================
+        
+        async function startMachine(number) {
+            try {
+                showToast(`🔄 Запуск станка №${number}...`, 'info');
+                const r = await api.sendCommand('start', [number]);
+                if (r.success) {
+                    showToast(`✅ Станок №${number} запущен!`, 'success');
+                    await loadMachines();
+                    await loadStats();
+                } else {
+                    showToast(`❌ ${r.error || 'Ошибка запуска'}`, 'error');
+                }
+            } catch (e) {
+                showToast('❌ Ошибка соединения', 'error');
+            }
         }
         
-        async function stopMachine(n) {
-            const r = await api.sendCommand('stop', [n]);
-            if (r.success) { showToast(`⏹️ Станок №${n} остановлен`, 'info'); loadMachines(); }
-            else showToast(r.error || '❌ Ошибка', 'error');
+        async function stopMachine(number) {
+            try {
+                showToast(`🔄 Остановка станка №${number}...`, 'info');
+                const r = await api.sendCommand('stop', [number]);
+                if (r.success) {
+                    showToast(`⏹️ Станок №${number} остановлен`, 'info');
+                    await loadMachines();
+                    await loadStats();
+                } else {
+                    showToast(`❌ ${r.error || 'Ошибка остановки'}`, 'error');
+                }
+            } catch (e) {
+                showToast('❌ Ошибка соединения', 'error');
+            }
         }
         
-        async function toggleHelper(n) {
-            const state = 'on';
-            const r = await api.sendCommand('helper', [n, state]);
-            if (r.success) { showToast(`👤 Срезальщица включена`, 'info'); loadMachines(); }
-            else showToast(r.error || '❌ Ошибка', 'error');
+        async function toggleHelper(number) {
+            try {
+                const btn = document.querySelector(`.machine-card[data-machine="${number}"] .btn-helper`);
+                const isActive = btn?.classList.contains('active');
+                const newState = isActive ? 'off' : 'on';
+                
+                showToast(`🔄 ${isActive ? 'Выключение' : 'Включение'} срезальщицы...`, 'info');
+                const r = await api.sendCommand('helper', [number, newState]);
+                if (r.success) {
+                    showToast(`👤 Срезальщица ${newState === 'on' ? 'включена' : 'выключена'} на станке №${number}`, 'info');
+                    await loadMachines();
+                } else {
+                    showToast(`❌ ${r.error || 'Ошибка'}`, 'error');
+                }
+            } catch (e) {
+                showToast('❌ Ошибка соединения', 'error');
+            }
+        }
+        
+        async function completeTask(taskId) {
+            try {
+                showToast(`🔄 Завершение задания #${taskId}...`, 'info');
+                const r = await api.sendCommand('complete', [taskId]);
+                if (r.success) {
+                    showToast(`✅ Задание #${taskId} завершено!`, 'success');
+                    await loadTasks();
+                    await loadStats();
+                } else {
+                    showToast(`❌ ${r.error || 'Ошибка'}`, 'error');
+                }
+            } catch (e) {
+                showToast('❌ Ошибка соединения', 'error');
+            }
+        }
+        
+        async function returnTask(taskId) {
+            try {
+                showToast(`🔄 Возврат задания #${taskId} в очередь...`, 'info');
+                const r = await api.sendCommand('return', [taskId]);
+                if (r.success) {
+                    showToast(`↩️ Задание #${taskId} возвращено в очередь`, 'info');
+                    await loadTasks();
+                    await loadStats();
+                } else {
+                    showToast(`❌ ${r.error || 'Ошибка'}`, 'error');
+                }
+            } catch (e) {
+                showToast('❌ Ошибка соединения', 'error');
+            }
         }
         
         // ========================================
@@ -297,17 +385,35 @@
             try {
                 const r = await api.verify();
                 if (!r.success) { window.location.href = '/login.html'; return; }
-                document.getElementById('userName').textContent = r.user?.login || 'Пользователь';
+                
+                const userName = r.user?.login || 'Пользователь';
+                document.getElementById('userName').textContent = userName;
+                
+                // Показываем админ-ссылки
+                if (r.user?.role === 'admin') {
+                    document.querySelectorAll('.admin-only').forEach(el => {
+                        el.style.display = 'block';
+                    });
+                }
+                
                 await Promise.all([loadStats(), loadTasks(), loadMachines()]);
-            } catch (e) { window.location.href = '/login.html'; }
+                console.log('✅ Дашборд загружен');
+            } catch (e) {
+                console.error('Ошибка инициализации:', e);
+                window.location.href = '/login.html';
+            }
         }
         
-        init();
-        setInterval(() => { 
+        // Автообновление каждые 30 секунд
+        setInterval(() => {
             if (window.location.pathname === '/dashboard') {
-                loadStats(); loadTasks(); loadMachines();
+                loadStats();
+                loadTasks();
+                loadMachines();
             }
         }, 30000);
+        
+        init();
     </script>
 </body>
 </html>
