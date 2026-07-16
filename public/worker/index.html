@@ -2,56 +2,1432 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dika Knit — Вязальщик</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+        /* ======================================== */
+        /*  СТИЛИ ДЛЯ ВЯЗАЛЬЩИКА                    */
+        /* ======================================== */
+        
+        .worker-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Виджет зарплаты */
+        .salary-widget {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(201,169,89,0.1);
+            border-radius: 16px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+        }
+        .salary-card {
+            text-align: center;
+        }
+        .salary-card .period {
+            font-size: 11px;
+            color: #8892b0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .salary-card .amount {
+            font-size: 24px;
+            font-weight: 800;
+            margin: 4px 0;
+        }
+        .salary-card .amount.shift { color: #4ade80; }
+        .salary-card .amount.week { color: #c9a959; }
+        .salary-card .amount.month { color: #60a5fa; }
+        .salary-card .amount.year { color: #a78bfa; }
+        .salary-card .details {
+            font-size: 11px;
+            color: #475569;
+        }
+
+        /* Секции */
+        .section {
+            margin-bottom: 32px;
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .section-header .toggle-btn {
+            font-size: 20px;
+            font-weight: 700;
+            color: #c9a959;
+            width: 30px;
+            text-align: center;
+            transition: 0.2s;
+        }
+        .section-header .title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #fff;
+        }
+        .section-header .count {
+            color: #8892b0;
+            font-size: 14px;
+            margin-left: auto;
+        }
+        .section-body.hidden {
+            display: none;
+        }
+
+        /* Карточки заданий */
+        .tasks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 20px;
+        }
+        .task-card {
+            background: rgba(255,255,255,0.04);
+            border-radius: 16px;
+            padding: 20px 24px;
+            border: 1px solid rgba(201,169,89,0.06);
+            transition: 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+        .task-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(201,169,89,0.15);
+            box-shadow: 0 20px 40px -12px rgba(0,0,0,0.5);
+        }
+        .task-card.urgent {
+            border: 2px solid #c9a959;
+            background: linear-gradient(135deg, rgba(201,169,89,0.15), rgba(201,169,89,0.05));
+            box-shadow: 0 0 30px rgba(201,169,89,0.1);
+            position: relative;
+        }
+        .task-card.urgent::before {
+            content: "СРОЧНО";
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: #f87171;
+            color: #fff;
+            font-weight: 800;
+            font-size: 10px;
+            padding: 2px 12px;
+            border-radius: 20px;
+            letter-spacing: 0.5px;
+        }
+        .task-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .task-meta {
+            color: #8892b0;
+            font-size: 14px;
+        }
+        .task-meta strong {
+            color: #fff;
+        }
+        .task-progress-block {
+            margin: 12px 0;
+        }
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: #8892b0;
+            margin-bottom: 4px;
+        }
+        .progress-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #c9a959, #e8c97a);
+            border-radius: 4px;
+            transition: width 0.6s ease;
+        }
+        .task-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+            align-items: flex-end;
+        }
+        .task-actions .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .task-actions label {
+            font-size: 10px;
+            color: #8892b0;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .task-actions select,
+        .task-actions input {
+            padding: 6px 10px;
+            font-size: 13px;
+            height: 36px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(201,169,89,0.15);
+            border-radius: 6px;
+            color: #fff;
+            min-width: 70px;
+        }
+        .task-actions select:focus,
+        .task-actions input:focus {
+            outline: none;
+            border-color: #c9a959;
+        }
+        .task-actions select option {
+            background: #1a1f36;
+            color: #fff;
+        }
+        .btn {
+            padding: 6px 14px;
+            height: 36px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: inherit;
+        }
+        .btn-save {
+            background: linear-gradient(135deg, #c9a959, #b89840);
+            color: #0a0e1a;
+        }
+        .btn-save:hover {
+            transform: scale(1.02);
+        }
+        .btn-print {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+        }
+        .btn-print:hover {
+            background: rgba(255,255,255,0.15);
+        }
+        .btn-undo {
+            background: #ff6b6b;
+            color: #fff;
+        }
+        .btn-undo:hover {
+            background: #ff5252;
+        }
+        .btn-threading {
+            background: #60a5fa;
+            color: #0a0e1a;
+        }
+        .btn-threading:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 15px rgba(96,165,250,0.3);
+        }
+        .btn-comment {
+            background: #8b5cf6;
+            color: #fff;
+        }
+        .btn-comment:hover {
+            background: #7c3aed;
+        }
+        .btn-return {
+            background: #f59e0b;
+            color: #fff;
+        }
+        .btn-return:hover {
+            background: #d97706;
+        }
+        .btn-start {
+            background: #4ade80;
+            color: #0a0e1a;
+        }
+        .btn-start:hover {
+            background: #22c55e;
+        }
+        .btn-stop {
+            background: #f87171;
+            color: #0a0e1a;
+        }
+        .btn-stop:hover {
+            background: #ef4444;
+        }
+        .btn-helper {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+            border: 1px solid rgba(201,169,89,0.15);
+        }
+        .btn-helper.active {
+            background: #c9a959;
+            color: #0a0e1a;
+            border-color: #c9a959;
+        }
+        .btn-send-admin {
+            padding: 8px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            background: #4ade80;
+            border: none;
+            border-radius: 8px;
+            color: #0a0e1a;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 12px;
+        }
+        .btn-send-admin:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(74,222,128,0.3);
+        }
+
+        /* Компактный список заказов */
+        .orders-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .order-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.03);
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(201,169,89,0.06);
+            transition: 0.2s;
+        }
+        .order-item:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(201,169,89,0.15);
+        }
+        .order-item.urgent-order {
+            border: 2px solid #c9a959;
+            background: linear-gradient(135deg, rgba(201,169,89,0.15), rgba(201,169,89,0.05));
+        }
+        .order-item .order-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+            align-items: center;
+            font-size: 14px;
+            color: #ddd;
+            flex: 1;
+        }
+        .order-item .order-info .name {
+            font-weight: 600;
+            color: #fff;
+        }
+        .order-item .order-info .badge {
+            font-size: 12px;
+            color: #8892b0;
+        }
+        .order-item .order-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .btn-take-work {
+            padding: 4px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #c9a959, #b89840);
+            border: none;
+            border-radius: 6px;
+            color: #0a0e1a;
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+        .btn-take-work:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(201,169,89,0.3);
+        }
+
+        /* Верхняя панель */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid rgba(201,169,89,0.08);
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .top-bar .logo {
+            font-size: 22px;
+            font-weight: 800;
+            color: #c9a959;
+        }
+        .top-bar .logo span {
+            color: #fff;
+            font-weight: 300;
+        }
+        .top-bar .user-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            color: #8892b0;
+            font-size: 14px;
+        }
+        .top-bar .user-info .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #c9a959;
+            color: #0a0e1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .top-bar .user-info a {
+            color: #f87171;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .top-bar .user-info a:hover {
+            text-decoration: underline;
+        }
+
+        /* Комментарии */
+        .comments-block {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #8892b0;
+            max-height: 60px;
+            overflow-y: auto;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding-top: 6px;
+        }
+        .comments-block .comment {
+            display: flex;
+            gap: 8px;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .comments-block .comment .author {
+            color: #c9a959;
+            font-weight: 600;
+            font-size: 11px;
+        }
+        .comments-block .comment .text {
+            color: #e2e8f0;
+            font-size: 12px;
+            flex: 1;
+        }
+        .comments-block .comment .time {
+            color: #475569;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+
+        /* Модальное окно */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .modal-content {
+            background: #1a1f36;
+            padding: 30px;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+            border: 1px solid rgba(201,169,89,0.1);
+        }
+        .modal-content h2 {
+            color: #c9a959;
+            margin-bottom: 15px;
+        }
+        .modal-content textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(201,169,89,0.2);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 14px;
+            resize: vertical;
+            margin-bottom: 15px;
+            font-family: inherit;
+        }
+        .modal-content textarea:focus {
+            outline: none;
+            border-color: #c9a959;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .modal-buttons .btn {
+            padding: 10px 24px;
+            font-size: 14px;
+        }
+        .modal-buttons .btn-cancel {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+        }
+        .modal-buttons .btn-cancel:hover {
+            background: rgba(255,255,255,0.15);
+        }
+        .modal-buttons .btn-submit {
+            background: linear-gradient(135deg, #c9a959, #b89840);
+            color: #0a0e1a;
+        }
+        .modal-buttons .btn-submit:hover {
+            transform: scale(1.02);
+        }
+
+        /* Адаптив */
+        @media (max-width: 768px) {
+            .salary-widget {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+                padding: 12px 16px;
+            }
+            .salary-card .amount {
+                font-size: 20px;
+            }
+            .tasks-grid {
+                grid-template-columns: 1fr;
+            }
+            .top-bar {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+            .top-bar .user-info {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            .task-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .task-actions .form-group {
+                width: 100%;
+            }
+            .task-actions select,
+            .task-actions input {
+                width: 100%;
+            }
+            .order-item {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            .order-item .order-actions {
+                justify-content: flex-end;
+            }
+        }
+        @media (max-width: 480px) {
+            .salary-widget {
+                grid-template-columns: 1fr 1fr;
+                gap: 6px;
+                padding: 10px 12px;
+            }
+            .section-header .title {
+                font-size: 18px;
+            }
+            .task-card {
+                padding: 16px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <header class="mobile-header">
-        <div class="header-content">
-            <div class="header-left">
-                <a href="/dashboard" class="back-btn">‹</a>
-                <span class="logo-text">Вязальщик</span>
+
+    <!-- ======================================== -->
+    <!--  ВЕРХНЯЯ ПАНЕЛЬ                         -->
+    <!-- ======================================== -->
+    <div class="top-bar">
+        <div class="logo">Dika <span>Knit</span></div>
+        <div class="user-info">
+            <span class="avatar"><%= user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U' %></span>
+            <span><%= user.fullName || 'Вязальщик' %></span>
+            <span style="color:#475569;">|</span>
+            <a href="/profile">🔑 Профиль</a>
+            <a href="/logout">🚪 Выйти</a>
+        </div>
+    </div>
+
+    <!-- ======================================== -->
+    <!--  ОСНОВНОЙ КОНТЕНТ                       -->
+    <!-- ======================================== -->
+    <div class="worker-container">
+
+        <!-- ======================================== -->
+        <!--  💰 ВИДЖЕТ ЗАРПЛАТЫ                     -->
+        <!-- ======================================== -->
+        <div class="salary-widget" id="salaryWidget">
+            <div class="salary-card">
+                <div class="period">Смена</div>
+                <div class="amount shift" id="salaryShift">0 ₽</div>
+                <div class="details" id="salaryShiftDetails">0 мин</div>
             </div>
-            <div class="header-right">
-                <span class="user-name" id="userName">Загрузка...</span>
+            <div class="salary-card">
+                <div class="period">2 недели</div>
+                <div class="amount week" id="salaryTwoWeeks">0 ₽</div>
+                <div class="details" id="salaryTwoWeeksDetails">с 00.00.0000</div>
+            </div>
+            <div class="salary-card">
+                <div class="period">Месяц</div>
+                <div class="amount month" id="salaryMonth">0 ₽</div>
+                <div class="details" id="salaryMonthDetails">с 00.00.0000</div>
+            </div>
+            <div class="salary-card">
+                <div class="period">Год</div>
+                <div class="amount year" id="salaryYear">0 ₽</div>
+                <div class="details" id="salaryYearDetails">с 00.00.0000</div>
             </div>
         </div>
-    </header>
-    
-    <main class="mobile-main">
-        <!-- Вкладки -->
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="machines">Станки</button>
-            <button class="tab-btn" data-tab="tasks">Задания</button>
-            <button class="tab-btn" data-tab="salary">Зарплата</button>
-        </div>
-        
-        <!-- Станки -->
-        <div class="tab-content active" id="tab-machines">
-            <div class="machines-grid" id="machinesGrid">
-                <div class="loading">Загрузка...</div>
+
+        <!-- ======================================== -->
+        <!--  🔥 В РАБОТЕ (ШАПКИ)                    -->
+        <!-- ======================================== -->
+        <% if (inProgressShapki && inProgressShapki.length > 0) { %>
+        <div class="section" id="sectionInProgressShapki">
+            <div class="section-header" onclick="toggleSection('inProgressShapki')">
+                <span class="toggle-btn" id="toggleInProgressShapki">−</span>
+                <span class="title">🔥 В работе (шапки)</span>
+                <span class="count"><%= inProgressShapki.length %> заказа(ов)</span>
+            </div>
+            <div class="section-body" id="bodyInProgressShapki">
+                <div class="tasks-grid">
+                    <% inProgressShapki.forEach(task => { 
+                        const done = task.doneQuantity || 0;
+                        const plan = task.planQuantity || 0;
+                        const percent = plan > 0 ? Math.min((done / plan) * 100, 100) : 0;
+                        const isCompleted = percent >= 100;
+                    %>
+                    <div class="task-card <%= task.isUrgent ? 'urgent' : '' %>" data-task-id="<%= task.id %>">
+                        <div class="task-title">
+                            <%= task.isUrgent ? '🔥 ' : '' %><%= task.Model ? task.Model.name : '—' %>
+                        </div>
+                        <div class="task-meta">
+                            🎨 <strong><%= task.Color ? task.Color.name : '—' %></strong>
+                            <% if (task.color2) { %>
+                                | ➕ <strong style="color:#c9a959;"><%= task.color2.name %></strong>
+                            <% } %>
+                            | 📄 <strong><%= task.Model ? task.Model.program : '—' %></strong>
+                            | 📏 <strong><%= task.Model ? task.Model.size : '—' %></strong>
+                            | 🧵 <strong><%= task.Model ? task.Model.yarn : '—' %></strong>
+                            | 🏢 <strong><%= task.ip || '—' %></strong>
+                        </div>
+
+                        <div class="task-progress-block">
+                            <div class="progress-label">
+                                <span>Прогресс</span>
+                                <span><strong style="color:#fff;"><%= done %></strong> из <strong style="color:#c9a959;"><%= plan %></strong> шт. (<span id="percent-<%= task.id %>"><%= Math.round(percent) %></span>%)</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-<%= task.id %>" style="width: <%= percent %>%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Комментарии -->
+                        <div class="comments-block" id="comments-<%= task.id %>"></div>
+
+                        <!-- Действия -->
+                        <div class="task-actions">
+                            <form onsubmit="event.preventDefault(); submitOperation(this)">
+                                <input type="hidden" name="taskId" value="<%= task.id %>">
+                                <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:flex-end;">
+                                    <div class="form-group">
+                                        <label>Станок</label>
+                                        <select name="machineId" required>
+                                            <option value="">Выбрать</option>
+                                            <% for (let i = 1; i <= 15; i++) { %>
+                                                <option value="<%= i %>">№<%= i %></option>
+                                            <% } %>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Кол-во</label>
+                                        <input type="number" name="quantity" placeholder="шт." min="1" required style="width:70px;">
+                                    </div>
+                                    <button type="submit" class="btn btn-save">💾</button>
+                                </div>
+                            </form>
+                            <button onclick="printLabel(<%= task.id %>)" class="btn btn-print">🖨️</button>
+                            <button onclick="openThreadingModal(<%= task.id %>)" class="btn btn-threading">📐</button>
+                            <% if (task.operations && task.operations.length > 0) { %>
+                                <button onclick="undoOperation(<%= task.id %>)" class="btn btn-undo">↩️</button>
+                            <% } %>
+                            <button onclick="openCommentModal(<%= task.id %>)" class="btn btn-comment">📝</button>
+                            <button onclick="returnTask(<%= task.id %>)" class="btn btn-return">↩️ Вернуть</button>
+                        </div>
+
+                        <% if (isCompleted && task.status !== 'completed') { %>
+                            <button onclick="sendToAdmin(<%= task.id %>)" class="btn-send-admin">📤 Отправить админу</button>
+                        <% } %>
+                    </div>
+                    <% }); %>
+                </div>
             </div>
         </div>
-        
-        <!-- Задания -->
-        <div class="tab-content" id="tab-tasks">
-            <div class="tasks-list" id="tasksList">
-                <div class="loading">Загрузка...</div>
+        <% } %>
+
+        <!-- ======================================== -->
+        <!--  🔥 В РАБОТЕ (КОФТЫ)                    -->
+        <!-- ======================================== -->
+        <% if (inProgressCoat && inProgressCoat.length > 0) { %>
+        <div class="section" id="sectionInProgressCoat">
+            <div class="section-header" onclick="toggleSection('inProgressCoat')">
+                <span class="toggle-btn" id="toggleInProgressCoat">−</span>
+                <span class="title">🔥 В работе (кофты)</span>
+                <span class="count"><%= inProgressCoat.length %> заказа(ов)</span>
+            </div>
+            <div class="section-body" id="bodyInProgressCoat">
+                <div class="tasks-grid">
+                    <% inProgressCoat.forEach(coat => { 
+                        const parts = coat.parts || [];
+                        let totalDone = 0, totalPlan = 0;
+                        parts.forEach(p => {
+                            totalDone += Math.min(p.doneQuantity || 0, p.planQuantity || 0);
+                            totalPlan += p.planQuantity || 0;
+                        });
+                        const percent = totalPlan > 0 ? Math.min((totalDone / totalPlan) * 100, 100) : 0;
+                        const isCompleted = percent >= 100;
+                    %>
+                    <div class="task-card coat-card <%= coat.isUrgent ? 'urgent' : '' %>" data-task-id="<%= coat.id %>">
+                        <div class="task-title">
+                            <%= coat.isUrgent ? '🔥 ' : '' %><%= coat.Model ? coat.Model.name : '—' %>
+                        </div>
+                        <div class="task-meta">
+                            🎨 <strong><%= coat.Color ? coat.Color.name : '—' %></strong>
+                            <% if (coat.color2) { %>
+                                | ➕ <strong style="color:#c9a959;"><%= coat.color2.name %></strong>
+                            <% } %>
+                            | 📄 <strong><%= coat.Model ? coat.Model.program : '—' %></strong>
+                            | 📏 <strong><%= coat.Model ? coat.Model.size : '—' %></strong>
+                            | 🧵 <strong><%= coat.Model ? coat.Model.yarn : '—' %></strong>
+                            | 🏢 <strong><%= coat.ip || '—' %></strong>
+                        </div>
+
+                        <div class="task-progress-block">
+                            <div class="progress-label">
+                                <span>Общий прогресс</span>
+                                <span><strong style="color:#fff;"><%= totalDone %></strong> из <strong style="color:#c9a959;"><%= totalPlan %></strong> шт. (<span id="percent-<%= coat.id %>"><%= Math.round(percent) %></span>%)</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-<%= coat.id %>" style="width: <%= percent %>%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Комментарии -->
+                        <div class="comments-block" id="comments-<%= coat.id %>"></div>
+
+                        <!-- Детали кофты -->
+                        <% if (parts.length > 0) { %>
+                        <div style="margin-top:12px; border-top:1px solid rgba(201,169,89,0.1); padding-top:12px;">
+                            <div style="color:#8892b0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">🧵 Детали кофты</div>
+                            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px;">
+                                <% parts.forEach(part => { 
+                                    const partDone = part.doneQuantity || 0;
+                                    const partPlan = part.planQuantity || 0;
+                                    const partPercent = partPlan > 0 ? Math.min((partDone / partPlan) * 100, 100) : 0;
+                                %>
+                                <div class="part-block" style="background:rgba(96,165,250,0.05); border-radius:8px; padding:10px 14px; border:1px solid rgba(96,165,250,0.15);" data-part-id="<%= part.id %>">
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <span style="font-weight:600; font-size:14px; color:#fff;"><%= part.partName || 'Деталь' %></span>
+                                        <span style="color:#8892b0; font-size:12px;"><%= part.Model ? part.Model.program : '—' %></span>
+                                    </div>
+                                    <div style="display:flex; justify-content:space-between; font-size:12px; color:#8892b0; margin:4px 0;">
+                                        <span>Выполнено: <span style="color:#c9a959; font-weight:600;"><%= partDone %>/<%= partPlan %></span></span>
+                                        <span><%= Math.round(partPercent) %>%</span>
+                                    </div>
+                                    <div style="height:3px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden; margin-bottom:6px;">
+                                        <div style="height:100%; background:linear-gradient(90deg, #c9a959, #e8c97a); border-radius:2px; width:<%= partPercent %>%; transition:width 0.3s;"></div>
+                                    </div>
+                                    <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+                                        <form onsubmit="event.preventDefault(); submitOperationPart(this, '<%= part.id %>')" style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
+                                            <input type="hidden" name="coatId" value="<%= coat.id %>">
+                                            <input type="hidden" name="partId" value="<%= part.id %>">
+                                            <select name="machineId" required style="padding:4px 8px; font-size:11px; height:28px; background:rgba(255,255,255,0.08); border:1px solid rgba(201,169,89,0.15); border-radius:4px; color:#fff; min-width:60px;">
+                                                <option value="">Станок</option>
+                                                <% for (let i = 1; i <= 15; i++) { %>
+                                                    <option value="<%= i %>">№<%= i %></option>
+                                                <% } %>
+                                            </select>
+                                            <input type="number" name="quantity" placeholder="шт." min="1" required style="padding:4px 8px; font-size:11px; height:28px; width:50px; background:rgba(255,255,255,0.08); border:1px solid rgba(201,169,89,0.15); border-radius:4px; color:#fff;">
+                                            <button type="submit" class="btn btn-save" style="padding:2px 10px; font-size:11px; height:28px;">💾</button>
+                                        </form>
+                                        <button onclick="printPartLabel(<%= part.id %>)" class="btn btn-print" style="padding:2px 10px; font-size:11px; height:28px;">🖨️</button>
+                                        <button onclick="openThreadingModalPart(<%= part.id %>)" class="btn btn-threading" style="padding:2px 10px; font-size:11px; height:28px;">📐</button>
+                                        <% if (part.operations && part.operations.length > 0) { %>
+                                            <button onclick="undoOperation(<%= part.id %>)" class="btn btn-undo" style="padding:2px 10px; font-size:11px; height:28px;">↩️</button>
+                                        <% } %>
+                                    </div>
+                                </div>
+                                <% }); %>
+                            </div>
+                        </div>
+                        <% } %>
+
+                        <!-- Действия для кофты -->
+                        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+                            <button onclick="openCommentModal(<%= coat.id %>)" class="btn btn-comment">📝 Комментарий</button>
+                            <button onclick="returnTask(<%= coat.id %>)" class="btn btn-return">↩️ Вернуть</button>
+                        </div>
+
+                        <% if (isCompleted && coat.status !== 'completed') { %>
+                            <button onclick="sendToAdmin(<%= coat.id %>)" class="btn-send-admin">📤 Отправить админу</button>
+                        <% } %>
+                    </div>
+                    <% }); %>
+                </div>
             </div>
         </div>
-        
-        <!-- Зарплата -->
-        <div class="tab-content" id="tab-salary">
-            <div class="salary-widget" id="salaryWidget">
-                <div class="loading">Загрузка...</div>
+        <% } %>
+
+        <!-- ======================================== -->
+        <!--  📋 ЗАКАЗЫ (ОЧЕРЕДЬ)                    -->
+        <!-- ======================================== -->
+        <div class="section" id="sectionOrders">
+            <div class="section-header" onclick="toggleSection('orders')">
+                <span class="toggle-btn" id="toggleOrders">−</span>
+                <span class="title">📋 Заказы в очереди</span>
+                <span class="count"><%= (pendingShapki || []).length + (pendingCoat || []).length %> заказа(ов)</span>
+            </div>
+            <div class="section-body" id="bodyOrders">
+                <% const hasPending = (pendingShapki && pendingShapki.length > 0) || (pendingCoat && pendingCoat.length > 0); %>
+                <% if (hasPending) { %>
+                    <div class="orders-list">
+                        <% if (pendingShapki && pendingShapki.length > 0) { %>
+                            <div style="color:#8892b0; font-size:13px; font-weight:600; margin:8px 0 4px 4px;">🧢 Шапки</div>
+                            <% pendingShapki.forEach(task => { %>
+                            <div class="order-item <%= task.isUrgent ? 'urgent-order' : '' %>">
+                                <div class="order-info">
+                                    <span class="name"><%= task.isUrgent ? '🔥 ' : '' %><%= task.Model ? task.Model.name : '—' %></span>
+                                    <span class="badge">📄 <%= task.Model ? task.Model.program : '—' %></span>
+                                    <span class="badge">🧵 <%= task.Model ? task.Model.yarn : '—' %></span>
+                                    <span class="badge" style="font-weight:700; color:#c9a959;">📦 <%= task.planQuantity %> шт.</span>
+                                    <span class="badge">🎨 <%= task.Color ? task.Color.name : '—' %></span>
+                                    <span class="badge">🏢 <%= task.ip || '—' %></span>
+                                </div>
+                                <div class="order-actions">
+                                    <button class="btn-take-work" onclick="takeToWork(<%= task.id %>)">🔄 В работу</button>
+                                </div>
+                            </div>
+                            <% }); %>
+                        <% } %>
+                        <% if (pendingCoat && pendingCoat.length > 0) { %>
+                            <div style="color:#8892b0; font-size:13px; font-weight:600; margin:12px 0 4px 4px;">🧥 Кофты</div>
+                            <% pendingCoat.forEach(coat => { 
+                                const partsInfo = (coat.parts || []).map(p => ({ name: p.partName || 'Деталь', qty: p.planQuantity || 0 }));
+                            %>
+                            <div class="order-item <%= coat.isUrgent ? 'urgent-order' : '' %>">
+                                <div class="order-info">
+                                    <span class="name"><%= coat.isUrgent ? '🔥 ' : '' %><%= coat.Model ? coat.Model.name : '—' %></span>
+                                    <span class="badge">📄 <%= coat.Model ? coat.Model.program : '—' %></span>
+                                    <span class="badge">🧵 <%= coat.Model ? coat.Model.yarn : '—' %></span>
+                                    <span class="badge" style="font-weight:700; color:#c9a959;">📦 <%= partsInfo.reduce((s, p) => s + p.qty, 0) %> шт.</span>
+                                    <span class="badge">🎨 <%= coat.Color ? coat.Color.name : '—' %></span>
+                                    <span class="badge">🏢 <%= coat.ip || '—' %></span>
+                                    <span class="badge" style="font-size:11px; color:#8892b0;">
+                                        <% partsInfo.forEach((p, i) => { %>
+                                            <span style="background:rgba(201,169,89,0.1); padding:0 6px; border-radius:4px; margin:0 2px; font-size:10px; color:#c9a959;"><%= p.name %>: <%= p.qty %></span>
+                                        <% }); %>
+                                    </span>
+                                </div>
+                                <div class="order-actions">
+                                    <button class="btn-take-work" onclick="takeToWork(<%= coat.id %>)">🔄 В работу</button>
+                                </div>
+                            </div>
+                            <% }); %>
+                        <% } %>
+                    </div>
+                <% } else { %>
+                    <div style="text-align:center; padding:40px; color:#8892b0; font-size:16px;">
+                        🎉 Все заказы взяты в работу! Отличная работа!
+                    </div>
+                <% } %>
             </div>
         </div>
-    </main>
-    
-    <script src="/js/api.js"></script>
-    <script src="/js/auth.js"></script>
-    <script src="/js/app.js"></script>
+
+    </div>
+
+    <!-- ======================================== -->
+    <!--  МОДАЛЬНОЕ ОКНО: КОММЕНТАРИЙ            -->
+    <!-- ======================================== -->
+    <div id="commentModal" class="modal">
+        <div class="modal-content">
+            <h2>📝 Комментарий</h2>
+            <textarea id="commentText" placeholder="Введите комментарий..." style="width:100%; min-height:100px; padding:12px; background:rgba(255,255,255,0.07); border:1px solid rgba(201,169,89,0.2); border-radius:10px; color:#fff; font-size:14px; resize:vertical; margin-bottom:15px; font-family:inherit;"></textarea>
+            <div class="modal-buttons">
+                <button onclick="closeCommentModal()" class="btn btn-cancel">❌ Отмена</button>
+                <button onclick="submitComment()" class="btn btn-submit">💾 Отправить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================== -->
+    <!--  МОДАЛЬНОЕ ОКНО: ЗАПРАВКА               -->
+    <!-- ======================================== -->
+    <div id="threadingModal" class="modal">
+        <div class="modal-content" style="max-width:500px;">
+            <h2 style="color:#c9a959; margin-bottom:10px;">📐 Заправка</h2>
+            <div id="threadingContent" style="background:rgba(255,255,255,0.03); padding:16px; border-radius:10px; color:#ddd; font-size:14px; line-height:1.6; white-space:pre-wrap; word-wrap:break-word; min-height:60px;"></div>
+            <div class="modal-buttons" style="margin-top:15px;">
+                <button onclick="closeThreadingModal()" class="btn btn-cancel">✖️ Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================== -->
+    <!--  МОДАЛЬНОЕ ОКНО: ПЕЧАТЬ                  -->
+    <!-- ======================================== -->
+    <div id="printPreviewModal" class="modal">
+        <div class="modal-content">
+            <h2>🖨️ Предпросмотр бирки</h2>
+            <div id="printPreviewContent" style="background:#fff; padding:20px; border-radius:8px; margin:15px 0; color:#000; font-family:Arial, sans-serif;">
+                <div style="font-size:12px; color:#c9a959; font-weight:800; text-transform:uppercase; border-bottom:1px solid #eee; padding-bottom:5px; margin-bottom:8px;">✦ Dika Knit</div>
+                <div id="previewModel" style="font-size:18px; font-weight:700; color:#0f0c29;"></div>
+                <div id="previewDetails" style="font-size:12px; color:#555;"></div>
+                <div id="previewQuantity" style="font-size:14px; font-weight:600; color:#c9a959; margin-top:5px;"></div>
+                <div style="font-size:8px; color:#aaa; border-top:1px solid #eee; padding-top:5px; margin-top:5px; text-align:center;">Dika Knit Production</div>
+            </div>
+            <div class="modal-buttons">
+                <button onclick="confirmPrint()" class="btn btn-submit">🖨️ Печать</button>
+                <button onclick="closePrintPreview()" class="btn btn-cancel">✖️ Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        //  ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+        // ========================================
+        let currentCommentTaskId = null;
+        let currentThreadingData = null;
+        let printData = null;
+
+        // ========================================
+        //  ФУНКЦИИ ДЛЯ ЗАРПЛАТЫ
+        // ========================================
+        async function updateSalary() {
+            try {
+                const res = await fetch('/api/salary/current', { credentials: 'include' });
+                const data = await res.json();
+                if (!data.success) return;
+
+                const d = data.data;
+                document.getElementById('salaryShift').textContent = Math.round(d.shift.accrued).toLocaleString() + ' ₽';
+                document.getElementById('salaryTwoWeeks').textContent = Math.round(d.twoWeeks.accrued + d.twoWeeks.carryOver).toLocaleString() + ' ₽';
+                document.getElementById('salaryMonth').textContent = Math.round(d.month.accrued + d.month.carryOver).toLocaleString() + ' ₽';
+                document.getElementById('salaryYear').textContent = Math.round(d.year.accrued + d.year.carryOver).toLocaleString() + ' ₽';
+
+                const shiftMins = d.shift.minutes || 0;
+                const h = Math.floor(shiftMins / 60);
+                const m = shiftMins % 60;
+                document.getElementById('salaryShiftDetails').textContent = h > 0 ? `${h}ч ${m}м` : `${m}м`;
+
+                const formatDate = (date) => new Date(date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                document.getElementById('salaryTwoWeeksDetails').textContent = `с ${formatDate(d.twoWeeks.start)}`;
+                document.getElementById('salaryMonthDetails').textContent = `с ${formatDate(d.month.start)}`;
+                document.getElementById('salaryYearDetails').textContent = `с ${formatDate(d.year.start)}`;
+            } catch (e) { console.error('Salary error:', e); }
+        }
+
+        // ========================================
+        //  СЕКЦИИ (СВЕРНУТЬ/РАЗВЕРНУТЬ)
+        // ========================================
+        function toggleSection(section) {
+            const body = document.getElementById('body' + section.charAt(0).toUpperCase() + section.slice(1));
+            const toggle = document.getElementById('toggle' + section.charAt(0).toUpperCase() + section.slice(1));
+            if (!body || !toggle) return;
+            if (body.classList.contains('hidden')) {
+                body.classList.remove('hidden');
+                toggle.textContent = '−';
+                localStorage.setItem('show' + section, 'true');
+            } else {
+                body.classList.add('hidden');
+                toggle.textContent = '+';
+                localStorage.setItem('show' + section, 'false');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            ['inProgressShapki', 'inProgressCoat', 'orders'].forEach(section => {
+                const body = document.getElementById('body' + section.charAt(0).toUpperCase() + section.slice(1));
+                const toggle = document.getElementById('toggle' + section.charAt(0).toUpperCase() + section.slice(1));
+                if (body && toggle) {
+                    const show = localStorage.getItem('show' + section);
+                    if (show === 'false') {
+                        body.classList.add('hidden');
+                        toggle.textContent = '+';
+                    } else {
+                        body.classList.remove('hidden');
+                        toggle.textContent = '−';
+                    }
+                }
+            });
+            updateSalary();
+            setInterval(updateSalary, 60000);
+            loadAllComments();
+        });
+
+        // ========================================
+        //  КОММЕНТАРИИ
+        // ========================================
+        function openCommentModal(taskId) {
+            currentCommentTaskId = taskId;
+            document.getElementById('commentText').value = '';
+            document.getElementById('commentModal').classList.add('active');
+            document.getElementById('commentText').focus();
+        }
+
+        function closeCommentModal() {
+            document.getElementById('commentModal').classList.remove('active');
+            currentCommentTaskId = null;
+        }
+
+        async function submitComment() {
+            const text = document.getElementById('commentText').value.trim();
+            if (!text || !currentCommentTaskId) {
+                alert('❌ Введите текст комментария');
+                return;
+            }
+            try {
+                const res = await fetch('/api/tasks/' + currentCommentTaskId + '/comment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ comment: text, machineNumber: null })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    closeCommentModal();
+                    showNotification('✅ Комментарий добавлен', 'success');
+                    loadComments(currentCommentTaskId);
+                } else {
+                    alert('❌ ' + (data.error || 'Ошибка'));
+                }
+            } catch (e) {
+                alert('❌ ' + e.message);
+            }
+        }
+
+        async function loadComments(taskId) {
+            try {
+                const res = await fetch('/api/tasks/' + taskId + '/comments?limit=3');
+                const data = await res.json();
+                if (data.success && data.comments.length > 0) {
+                    const container = document.getElementById('comments-' + taskId);
+                    if (container) {
+                        let html = '';
+                        data.comments.forEach(c => {
+                            const date = new Date(c.createdAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                            html += `<div class="comment"><span class="author">${c.User ? c.User.fullName : '—'}:</span><span class="text">${c.comment}</span><span class="time">${date}</span></div>`;
+                        });
+                        container.innerHTML = html;
+                        container.style.display = 'block';
+                    }
+                }
+            } catch (e) { console.error('Comments error:', e); }
+        }
+
+        function loadAllComments() {
+            document.querySelectorAll('.task-card').forEach(card => {
+                const id = card.dataset.taskId;
+                if (id) loadComments(id);
+            });
+        }
+
+        // ========================================
+        //  ЗАПРАВКА
+        // ========================================
+        function openThreadingModal(taskId) {
+            const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+            if (!card) return;
+            const threading = card.dataset.threading || '';
+            const modelName = card.querySelector('.task-title')?.textContent?.trim() || 'Модель';
+            showThreadingModal(modelName, threading);
+        }
+
+        function openThreadingModalPart(partId) {
+            const part = document.querySelector(`.part-block[data-part-id="${partId}"]`);
+            if (!part) return;
+            const threading = part.dataset.threading || '';
+            const name = part.querySelector('span:first-child')?.textContent?.trim() || 'Деталь';
+            showThreadingModal(name, threading);
+        }
+
+        function showThreadingModal(name, threading) {
+            const modal = document.getElementById('threadingModal');
+            const content = document.getElementById('threadingContent');
+            if (!threading || threading.trim() === '') {
+                content.innerHTML = `⚠️ Для <strong>${name}</strong> информация о заправке не указана.`;
+            } else {
+                content.innerHTML = `<strong>${name}</strong>\n\n${threading}`;
+            }
+            modal.classList.add('active');
+        }
+
+        function closeThreadingModal() {
+            document.getElementById('threadingModal').classList.remove('active');
+        }
+
+        // ========================================
+        //  ВЗЯТЬ В РАБОТУ
+        // ========================================
+        async function takeToWork(taskId) {
+            const btn = document.querySelector(`button[onclick="takeToWork(${taskId})"]`);
+            if (btn) { btn.textContent = '⏳...'; btn.disabled = true; }
+            try {
+                const res = await fetch('/api/tasks/' + taskId + '/status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'in_progress' })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showNotification('✅ Заказ #' + taskId + ' взят в работу!', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    alert('❌ ' + (data.error || 'Ошибка'));
+                    if (btn) { btn.textContent = '🔄 В работу'; btn.disabled = false; }
+                }
+            } catch (e) {
+                alert('❌ ' + e.message);
+                if (btn) { btn.textContent = '🔄 В работу'; btn.disabled = false; }
+            }
+        }
+
+        // ========================================
+        //  ОТПРАВКА ВЫРАБОТКИ
+        // ========================================
+        async function submitOperation(form) {
+            const fd = new FormData(form);
+            const data = {
+                taskId: fd.get('taskId'),
+                machineId: fd.get('machineId'),
+                quantity: fd.get('quantity')
+            };
+            if (!data.machineId || !data.quantity || data.quantity < 1) {
+                alert('❌ Выберите станок и укажите количество');
+                return;
+            }
+            const btn = form.querySelector('button[type="submit"]');
+            if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+            try {
+                const res = await fetch('/api/operations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                if (result.success) {
+                    updateTaskProgress(data.taskId, result);
+                    showPreview({
+                        modelName: document.querySelector(`.task-card[data-task-id="${data.taskId}"] .task-title`)?.textContent?.trim() || '—',
+                        quantity: data.quantity,
+                        taskId: data.taskId,
+                        machineId: data.machineId
+                    });
+                    form.querySelector('input[name="quantity"]').value = '';
+                    showNotification('✅ +' + data.quantity + ' шт.', 'success');
+                } else {
+                    alert('❌ ' + (result.error || 'Ошибка'));
+                }
+            } catch (e) { alert('❌ ' + e.message); }
+            if (btn) { btn.textContent = '💾'; btn.disabled = false; }
+        }
+
+        async function submitOperationPart(form, partId) {
+            const fd = new FormData(form);
+            const data = {
+                taskId: fd.get('coatId'),
+                partId: partId,
+                machineId: fd.get('machineId'),
+                quantity: fd.get('quantity')
+            };
+            if (!data.machineId || !data.quantity || data.quantity < 1) {
+                alert('❌ Выберите станок и укажите количество');
+                return;
+            }
+            const btn = form.querySelector('button[type="submit"]');
+            if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+            try {
+                const res = await fetch('/api/operations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                if (result.success) {
+                    const partBlock = document.querySelector(`.part-block[data-part-id="${partId}"]`);
+                    if (partBlock) {
+                        const valEl = partBlock.querySelector('span[style*="color:#c9a959"]');
+                        const percentEl = partBlock.querySelector('div[style*="height:3px"] > div');
+                        if (valEl) {
+                            const p = result.planQuantity || 0;
+                            const d = Math.min(result.totalDone || 0, p);
+                            valEl.textContent = d + '/' + p;
+                        }
+                        if (percentEl) {
+                            const p = result.planQuantity || 0;
+                            const d = Math.min(result.totalDone || 0, p);
+                            const pc = p > 0 ? Math.round((d / p) * 100) : 0;
+                            percentEl.style.width = pc + '%';
+                            const parent = percentEl.parentElement;
+                            if (parent) {
+                                const sibling = parent.nextElementSibling;
+                                if (sibling && sibling.tagName === 'SPAN') {
+                                    sibling.textContent = pc + '%';
+                                }
+                            }
+                        }
+                    }
+                    if (result.parentProgress) {
+                        updateTaskProgress(data.taskId, result.parentProgress);
+                    }
+                    const card = document.querySelector(`.task-card[data-task-id="${data.taskId}"]`);
+                    showPreview({
+                        modelName: card?.querySelector('.task-title')?.textContent?.trim() || '—',
+                        partName: partBlock?.querySelector('span:first-child')?.textContent?.trim() || 'Деталь',
+                        quantity: data.quantity,
+                        taskId: data.taskId,
+                        machineId: data.machineId
+                    });
+                    form.querySelector('input[name="quantity"]').value = '';
+                    showNotification('✅ +' + data.quantity + ' шт. для детали', 'success');
+                } else {
+                    alert('❌ ' + (result.error || 'Ошибка'));
+                }
+            } catch (e) { alert('❌ ' + e.message); }
+            if (btn) { btn.textContent = '💾'; btn.disabled = false; }
+        }
+
+        function updateTaskProgress(taskId, progress) {
+            const percentEl = document.getElementById('percent-' + taskId);
+            const progressBar = document.getElementById('progress-' + taskId);
+            if (percentEl) percentEl.textContent = Math.round(progress.percent || 0);
+            if (progressBar) progressBar.style.width = (progress.percent || 0) + '%';
+        }
+
+        // ========================================
+        //  ПЕЧАТЬ
+        // ========================================
+        function printLabel(taskId) {
+            const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+            if (!card) { alert('❌ Задание не найдено'); return; }
+            const qtyInput = card.querySelector('input[name="quantity"]');
+            const qty = qtyInput ? qtyInput.value || '0' : '0';
+            if (qty === '0' || qty === '') { alert('⚠️ Введите количество'); return; }
+            const model = card.querySelector('.task-title')?.textContent?.trim() || 'Модель';
+            printLabelWithData(taskId, qty, model, null);
+        }
+
+        function printPartLabel(partId) {
+            const part = document.querySelector(`.part-block[data-part-id="${partId}"]`);
+            if (!part) { alert('❌ Деталь не найдена'); return; }
+            const qtyInput = part.querySelector('input[name="quantity"]');
+            const qty = qtyInput ? qtyInput.value || '0' : '0';
+            if (qty === '0' || qty === '') { alert('⚠️ Введите количество'); return; }
+            const card = part.closest('.task-card');
+            const model = card?.querySelector('.task-title')?.textContent?.trim() || 'Модель';
+            const partName = part.querySelector('span:first-child')?.textContent?.trim() || 'Деталь';
+            printLabelWithData(card?.dataset.taskId || '0', qty, model, partName);
+        }
+
+        function printLabelWithData(taskId, quantity, modelName, partName) {
+            const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+            if (!card) return;
+            const color = card.querySelector('.task-meta')?.textContent?.match(/🎨\s*([^\|]+)/)?.[1]?.trim() || '—';
+            const program = card.querySelector('.task-meta')?.textContent?.match(/📄\s*([^\|]+)/)?.[1]?.trim() || '—';
+            const size = card.querySelector('.task-meta')?.textContent?.match(/📏\s*([^\|]+)/)?.[1]?.trim() || '—';
+            const className = card.closest('.task-card')?.parentElement?.parentElement?.querySelector('.class-header .class-title')?.textContent?.replace('🔧 Класс', '').trim() || '—';
+            const fullName = document.querySelector('.user-info span:nth-child(2)')?.textContent?.trim() || 'Вязальщик';
+            const date = new Date().toLocaleDateString('ru-RU');
+            const ip = card.dataset.ip || '—';
+            const isUrgent = card.classList.contains('urgent');
+
+            const displayName = partName ? modelName + ' (' + partName + ')' : modelName;
+
+            const win = window.open('', '_blank', 'width=400,height=300');
+            if (!win) { alert('❌ Разрешите всплывающие окна'); return; }
+            win.document.write(`
+                <!DOCTYPE html>
+                <html><head><meta charset="UTF-8"><title>Этикетка Dika Knit</title>
+                <style>
+                    * { margin:0; padding:0; box-sizing:border-box; }
+                    @page { size: 56mm 32mm; margin: 0; }
+                    html, body { margin:0; padding:0; width:56mm; height:32mm; background:white; display:flex; justify-content:center; align-items:flex-start; font-family:Arial, sans-serif; }
+                    .label { width:56mm; height:32mm; padding:0.2mm 2.5mm 1mm 2.5mm; border:none; display:flex; flex-direction:column; justify-content:flex-start; background:white; }
+                    .label .title-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5px; }
+                    .label .model { font-size:13px; font-weight:700; color:#000; line-height:1.1; }
+                    .label .urgent-badge { font-size:11px; font-weight:900; color:#f87171; white-space:nowrap; margin-left:8px; }
+                    .label .quantity { font-size:18px; font-weight:700; color:#c9a959; margin:0px 0 0.5px 0; }
+                    .label .info { font-size:9px; color:#333; line-height:1.2; }
+                    .label .info span { font-weight:600; color:#000; }
+                    .label .color-dot { display:inline-block; width:6px; height:6px; border-radius:50%; vertical-align:middle; margin-right:2px; border:0.5px solid #ccc; }
+                    .label .bottom-section { margin-top:auto; border-top:2px solid #c9a959; padding-top:1px; text-align:center; font-size:8px; font-weight:800; color:#c9a959; letter-spacing:0.5px; text-transform:uppercase; }
+                    .label .part-badge { display:inline-block; background:#c9a959; color:#000; font-size:7px; font-weight:700; padding:0 5px; border-radius:3px; margin-left:4px; text-transform:uppercase; }
+                    @media print { html, body { margin:0; padding:0; width:56mm; height:32mm; } }
+                </style>
+                </head>
+                <body>
+                    <div class="label">
+                        <div class="title-row">
+                            <div class="model">${displayName} ${partName ? '<span class="part-badge">'+partName+'</span>' : ''}</div>
+                            ${isUrgent ? '<div class="urgent-badge">СРОЧНО</div>' : ''}
+                        </div>
+                        <div class="quantity">${quantity} шт.</div>
+                        <div class="info"><span class="color-dot" style="background:${color};"></span> Цвет: <span>${color}</span> &nbsp;|&nbsp; Класс: <span>${className}</span></div>
+                        <div class="info">Программа: <span>${program}</span> &nbsp;|&nbsp; Размер: <span>${size}</span></div>
+                        <div class="info">ИП: <span>${ip}</span> &nbsp;|&nbsp; Вязал: <span>${fullName}</span> &nbsp;|&nbsp; ${date}</div>
+                        <div class="bottom-section">Dika Knit</div>
+                    </div>
+                    <script>
+                        window.onload = function() {
+                            setTimeout(function() { window.print(); setTimeout(function() { window.close(); }, 500); }, 500);
+                        };
+                    <\/script>
+                </body>
+                </html>
+            `);
+            win.document.close();
+        }
+
+        // ========================================
+        //  ПРЕДПРОСМОТР ПЕЧАТИ
+        // ========================================
+        function showPreview(data) {
+            const modal = document.getElementById('printPreviewModal');
+            document.getElementById('previewModel').textContent = data.partName ? data.modelName + ' (' + data.partName + ')' : data.modelName;
+            document.getElementById('previewDetails').innerHTML = `Станок: №${data.machineId || '—'} | ${data.partName ? 'Деталь: ' + data.partName : ''}`;
+            document.getElementById('previewQuantity').textContent = `📦 ${data.quantity} шт.`;
+            printData = data;
+            modal.classList.add('active');
+        }
+
+        function closePrintPreview() {
+            document.getElementById('printPreviewModal').classList.remove('active');
+            printData = null;
+        }
+
+        function confirmPrint() {
+            if (printData) {
+                printLabelWithData(printData.taskId, printData.quantity, printData.modelName, printData.partName || null);
+                closePrintPreview();
+                showNotification('🖨️ Этикетка отправлена на печать', 'success');
+            }
+        }
+
+        // ========================================
+        //  ОТМЕНА ОПЕРАЦИИ
+        // ========================================
+        async function undoOperation(taskId) {
+            if (!confirm('Отменить последнюю операцию для задания #' + taskId + '?')) return;
+            try {
+                const res = await fetch('/api/operations/undo/' + taskId, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    showNotification('✅ Операция отменена', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    alert('❌ ' + (data.error || 'Ошибка'));
+                }
+            } catch (e) { alert('❌ ' + e.message); }
+        }
+
+        // ========================================
+        //  ВЕРНУТЬ В ОЧЕРЕДЬ
+        // ========================================
+        async function returnTask(taskId) {
+            if (!confirm(`↩️ Вернуть заказ #${taskId} в очередь?`)) return;
+            try {
+                const res = await fetch('/api/tasks/' + taskId + '/return', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    showNotification('✅ Заказ #' + taskId + ' возвращён в очередь', 'info');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    alert('❌ ' + (data.error || 'Ошибка'));
+                }
+            } catch (e) { alert('❌ ' + e.message); }
+        }
+
+        // ========================================
+        //  ОТПРАВИТЬ АДМИНУ
+        // ========================================
+        async function sendToAdmin(taskId) {
+            if (!confirm('Отправить задание #' + taskId + ' администратору?')) return;
+            try {
+                const res = await fetch('/api/tasks/complete/' + taskId, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    showNotification('✅ Задание #' + taskId + ' отправлено админу!', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    alert('❌ ' + (data.error || 'Ошибка'));
+                }
+            } catch (e) { alert('❌ ' + e.message); }
+        }
+
+        // ========================================
+        //  УВЕДОМЛЕНИЯ
+        // ========================================
+        function showNotification(message, type) {
+            const colors = { success: '#4ade80', error: '#f87171', info: '#c9a959' };
+            const el = document.createElement('div');
+            el.style.cssText = `
+                position: fixed; top: 80px; right: 20px; z-index: 9999;
+                background: rgba(255,255,255,0.08); color: #fff;
+                padding: 14px 20px; border-radius: 12px;
+                border-left: 4px solid ${colors[type] || colors.info};
+                box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+                font-size: 14px; font-weight: 500;
+                animation: slideInRight 0.4s ease;
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255,255,255,0.05);
+                max-width: 350px;
+            `;
+            el.textContent = message;
+            document.body.appendChild(el);
+            setTimeout(() => {
+                el.style.animation = 'slideOutRight 0.4s ease';
+                setTimeout(() => el.remove(), 400);
+            }, 4000);
+        }
+
+        // Добавляем анимации
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = `
+            @keyframes slideInRight { from { opacity:0; transform:translateX(60px); } to { opacity:1; transform:translateX(0); } }
+            @keyframes slideOutRight { from { opacity:1; transform:translateX(0); } to { opacity:0; transform:translateX(60px); } }
+        `;
+        document.head.appendChild(styleSheet);
+    </script>
+
 </body>
 </html>
