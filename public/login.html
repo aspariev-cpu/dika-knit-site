@@ -41,6 +41,9 @@
     <script src="/js/api.js"></script>
     <script src="/js/auth.js"></script>
     <script>
+        // ========================================
+        //  ОБРАБОТЧИК ФОРМЫ
+        // ========================================
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
@@ -58,13 +61,21 @@
             }
         });
 
-        // Если уже есть токен — перенаправляем
-        if (api.token) {
-            const result = await api.verify();
-            if (result.success) {
-                window.location.href = '/dashboard';
+        // ========================================
+        //  ПРОВЕРКА ТОКЕНА ПРИ ЗАГРУЗКЕ
+        // ========================================
+        (async function checkToken() {
+            if (api.token) {
+                try {
+                    const result = await api.verify();
+                    if (result.success) {
+                        window.location.href = '/dashboard';
+                    }
+                } catch (err) {
+                    console.error('Token check error:', err);
+                }
             }
-        }
+        })();
     </script>
 </body>
 </html>
