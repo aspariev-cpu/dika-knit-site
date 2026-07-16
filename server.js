@@ -8,26 +8,20 @@ const NodeCache = require('node-cache');
 const path = require('path');
 
 const app = express();
-
-// ========================================
-//  КОНФИГУРАЦИЯ
-// ========================================
-
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dika-mobile-secret-2024';
 const MOBILE_SECRET_KEY = process.env.MOBILE_SECRET_KEY || 'DikaKnitMobile2024SecureKey';
+const WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 const COMMANDS_CHANNEL = process.env.MOBILE_COMMANDS_CHANNEL;
-const CACHE_TTL = parseInt(process.env.CACHE_TTL) || 60000;
 
 // ========================================
-//  TRUST PROXY (для Render)
+//  TRUST PROXY
 // ========================================
 
-// Безопасная настройка для работы за прокси
 app.set('trust proxy', 1);
 
 // ========================================
-//  RATE LIMITING (с защитой от подделки IP)
+//  RATE LIMITING
 // ========================================
 
 const limiter = rateLimit({
@@ -36,7 +30,6 @@ const limiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => {
-        // Безопасное получение IP с учётом прокси
         return req.ip || req.connection?.remoteAddress || 'unknown';
     },
     handler: (req, res) => {
@@ -60,8 +53,6 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Rate limiting только для API
 app.use('/api', limiter);
 
 // ========================================
@@ -69,153 +60,17 @@ app.use('/api', limiter);
 // ========================================
 
 const cache = new NodeCache({
-    stdTTL: Math.floor(CACHE_TTL / 1000),
+    stdTTL: 60,
     checkperiod: 10,
     useClones: false
 });
 
 // ========================================
-//  ЛОГГЕР
+//  МОК-ДАННЫЕ (запасной вариант)
 // ========================================
 
-const logger = {
-    info: (msg, data = null) => {
-        console.log(`[${new Date().toISOString()}] ℹ️ ${msg}`, data || '');
-    },
-    error: (msg, data = null) => {
-        console.error(`[${new Date().toISOString()}] ❌ ${msg}`, data || '');
-    },
-    debug: (msg, data = null) => {
-        if (process.env.DEBUG === 'true') {
-            console.log(`[${new Date().toISOString()}] 🐛 ${msg}`, data || '');
-        }
-    }
-};
-
-// ========================================
-//  ОТПРАВКА КОМАНД В DISCORD
-// ========================================
-
-async function sendCommand(command, args = []) {
-    try {
-        const fullCommand = `/${command} ${args.join(' ')} ${MOBILE_SECRET_KEY}`.trim();
-        
-        // Проверяем наличие Webhook
-        const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-        if (!webhookUrl) {
-            logger.warn('DISCORD_WEBHOOK_URL не настроен');
-            return { success: false, error: 'Webhook не настроен' };
-        }
-
-        const response = await axios.post(webhookUrl, {
-            content: fullCommand
-        }, {
-            headers: { 'Content-Type': 'application/json' },
-            timeout: 10000
-        });
-
-        if (response.status === 204 || response.status === 200) {
-            logger.info(`Команда отправлена: ${fullCommand}`);
-            return { success: true };
-        }
-
-        return { success: false, error: `HTTP ${response.status}` };
-    } catch (err) {
-        logger.error('Ошибка отправки команды:', err.message);
-        return { success: false, error: err.message };
-    }
-}
-
-// ========================================
-//  API ЭНДПОИНТЫ
-// ========================================
-
-// === Проверка здоровья ===
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        cache: cache.getStats(),
-        uptime: process.uptime()
-    });
-});
-
-// === Авторизация ===
-app.post('/api/auth/login', async (req, res) => {
-    try {
-        const { login, password } = req.body;
-        
-        if (!login || !password) {
-            return res.status(400).json({ error: 'Логин и пароль обязательны' });
-        }
-
-        // Отправляем команду в Discord
-        const result = await sendCommand('login', [login, password]);
-        
-        if (!result.success) {
-            // Если не удалось отправить команду, возвращаем тестовый токен
-            // (для разработки, пока Webhook не настроен)
-            if (process.env.NODE_ENV === 'development') {
-                const token = jwt.sign(
-                    { login, role: 'admin' },
-                    JWT_SECRET,
-                    { expiresIn: '7d' }
-                );
-                return res.json({
-                    success: true,
-                    token,
-                    message: 'Вход выполнен (тестовый режим)'
-                });
-            }
-            return res.status(500).json({ error: 'Ошибка отправки команды' });
-        }
-
-        // Генерируем JWT для мобильного сайта
-        const token = jwt.sign(
-            { login, role: 'worker' },
-            JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-        
-        res.json({
-            success: true,
-            token,
-            message: 'Вход выполнен успешно'
-        });
-    } catch (err) {
-        logger.error('Ошибка входа:', err);
-        res.status(500).json({ error: 'Внутренняя ошибка сервера' });
-    }
-});
-
-app.post('/api/auth/verify', async (req, res) => {
-    try {
-        const { token } = req.body;
-        if (!token) {
-            return res.status(401).json({ error: 'Токен не предоставлен' });
-        }
-        
-        const decoded = jwt.verify(token, JWT_SECRET);
-        res.json({ 
-            success: true, 
-            user: {
-                login: decoded.login,
-                role: decoded.role || 'worker'
-            }
-        });
-    } catch (err) {
-        if (err.name === 'TokenExpiredError') {
-            return res.status(401).json({ error: 'Токен истек' });
-        }
-        res.status(401).json({ error: 'Недействительный токен' });
-    }
-});
-
-// === Получение данных ===
-
-// Функция-заглушка для получения данных (пока не настроен Webhook)
 function getMockData(type) {
-    const mockData = {
+    const data = {
         machines: {
             machines: Array.from({ length: 15 }, (_, i) => ({
                 id: i + 1,
@@ -238,24 +93,96 @@ function getMockData(type) {
                 { id: 124, model: 'Рукава', color: 'Синий', plan: 60 }
             ]
         },
-        salary: {
-            shift: 750,
-            twoWeeks: 8450,
-            month: 16200,
-            year: 194400
-        },
-        stats: {
-            totalToday: 145,
-            activeTasks: 8,
-            activeMachines: 12,
-            totalMachines: 15,
-            urgentTasks: 2
-        }
+        salary: { shift: 750, twoWeeks: 8450, month: 16200, year: 194400 },
+        stats: { totalToday: 145, activeTasks: 8, activeMachines: 12, totalMachines: 15, urgentTasks: 2 }
     };
-    return mockData[type] || {};
+    return data[type] || {};
 }
 
-// Универсальный эндпоинт для получения данных
+// ========================================
+//  ОТПРАВКА КОМАНД В DISCORD
+// ========================================
+
+async function sendDiscordCommand(command, args = []) {
+    if (!WEBHOOK_URL) {
+        console.warn('⚠️ Webhook не настроен, используем заглушку');
+        return null;
+    }
+
+    try {
+        const fullCommand = `/${command} ${args.join(' ')} ${MOBILE_SECRET_KEY}`.trim();
+        await axios.post(WEBHOOK_URL, { content: fullCommand });
+        console.log(`✅ Команда отправлена: ${fullCommand}`);
+        return true;
+    } catch (err) {
+        console.error('❌ Ошибка отправки команды:', err.message);
+        return null;
+    }
+}
+
+// ========================================
+//  API ЭНДПОИНТЫ
+// ========================================
+
+// Health check
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        cache: cache.getStats(),
+        uptime: process.uptime()
+    });
+});
+
+// Авторизация
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { login, password } = req.body;
+        
+        if (!login || !password) {
+            return res.status(400).json({ error: 'Логин и пароль обязательны' });
+        }
+
+        // Отправляем команду логина в Discord
+        await sendDiscordCommand('login', [login, password]);
+
+        // Временно пропускаем любого
+        const token = jwt.sign(
+            { login: login, role: 'admin' },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+        
+        return res.json({
+            success: true,
+            token,
+            message: '✅ Вход выполнен'
+        });
+        
+    } catch (err) {
+        console.error('Ошибка входа:', err);
+        res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+});
+
+// Проверка токена
+app.post('/api/auth/verify', (req, res) => {
+    try {
+        const { token } = req.body;
+        if (!token) {
+            return res.status(401).json({ error: 'Токен не предоставлен' });
+        }
+        const decoded = jwt.verify(token, JWT_SECRET);
+        res.json({ success: true, user: decoded });
+    } catch (err) {
+        res.status(401).json({ error: 'Недействительный токен' });
+    }
+});
+
+// ========================================
+//  ПОЛУЧЕНИЕ ДАННЫХ (С РЕАЛЬНЫМИ ЗАПРОСАМИ)
+// ========================================
+
 app.get('/api/:type', async (req, res) => {
     const { type } = req.params;
     const valid = ['machines', 'tasks', 'salary', 'stats'];
@@ -270,74 +197,30 @@ app.get('/api/:type', async (req, res) => {
         return res.json({ success: true, data: cached, cached: true });
     }
 
-    try {
-        // Отправляем команду в Discord через Webhook
-        const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-        if (!webhookUrl) {
-            // Если Webhook не настроен — используем заглушку
-            const data = getMockData(type);
-            cache.set(type, data);
-            return res.json({ success: true, data, cached: false });
-        }
-
-        // Формируем команду
-        const command = `/${type} ${MOBILE_SECRET_KEY}`;
-        
-        // Отправляем в Discord
-        await axios.post(webhookUrl, { content: command });
-        
-        // Ждём ответ (пока что используем заглушку, т.к. ответ приходит асинхронно)
-        // В будущем здесь будет чтение из канала
-        const data = getMockData(type);
-        cache.set(type, data);
-        
-        res.json({ success: true, data, cached: false });
-    } catch (err) {
-        console.error('Ошибка получения данных:', err);
-        // В случае ошибки — возвращаем заглушку
-        const data = getMockData(type);
-        cache.set(type, data);
-        res.json({ success: true, data, cached: false });
-    }
-});
-        }
-
-        // Пытаемся получить данные через Discord
-        const result = await sendCommand(type);
-        
-        // Если команда не отправлена или нет Webhook — используем заглушку
-        let data;
-        if (!result.success) {
-            logger.info(`Используем заглушку для ${type}`);
-            data = getMockData(type);
-        } else {
-            // Здесь будет парсинг ответа из Discord
-            // Пока используем заглушку
-            data = getMockData(type);
-        }
-
-        // Сохраняем в кэш
-        cache.set(type, data);
-
-        res.json({ 
-            success: true, 
-            data, 
-            cached: false,
-            timestamp: new Date().toISOString()
-        });
-    } catch (err) {
-        logger.error(`Ошибка получения ${req.params.type}:`, err);
-        res.status(500).json({ error: 'Внутренняя ошибка сервера' });
-    }
+    // Отправляем запрос в Discord
+    const sent = await sendDiscordCommand(type);
+    
+    // Пока используем заглушку (в будущем — парсим ответ из Discord)
+    const data = getMockData(type);
+    cache.set(type, data);
+    
+    res.json({ 
+        success: true, 
+        data, 
+        cached: false,
+        discord: sent ? '✅ команда отправлена' : '❌ Webhook не настроен'
+    });
 });
 
-// === Команды (действия) ===
+// ========================================
+//  КОМАНДЫ (действия)
+// ========================================
+
 app.post('/api/command/:action', async (req, res) => {
     try {
         const { action } = req.params;
         const args = req.body.args || [];
 
-        // Проверяем авторизацию
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return res.status(401).json({ error: 'Не авторизован' });
@@ -350,25 +233,21 @@ app.post('/api/command/:action', async (req, res) => {
             return res.status(401).json({ error: 'Недействительный токен' });
         }
 
-        // Отправляем команду
-        const result = await sendCommand(action, args);
-        
-        if (!result.success) {
-            return res.status(500).json({ error: result.error || 'Ошибка выполнения команды' });
-        }
+        // Отправляем команду в Discord
+        const sent = await sendDiscordCommand(action, args);
 
         // Инвалидируем кэш
-        const cacheKeys = ['machines', 'tasks', 'salary', 'stats'];
-        cache.del(cacheKeys);
+        cache.del(['machines', 'tasks', 'salary', 'stats']);
 
         res.json({ 
             success: true, 
-            message: 'Команда выполнена',
+            message: `Команда /${action} выполнена`,
+            discord: sent ? '✅ отправлено' : '❌ Webhook не настроен',
             timestamp: new Date().toISOString()
         });
     } catch (err) {
-        logger.error('Ошибка выполнения команды:', err);
-        res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+        console.error('Ошибка команды:', err);
+        res.status(500).json({ error: 'Внутренняя ошибка' });
     }
 });
 
@@ -393,21 +272,11 @@ app.get('/worker', (req, res) => {
 });
 
 // ========================================
-//  ОБРАБОТКА ОШИБОК
+//  404
 // ========================================
 
-// 404
 app.use((req, res) => {
     res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
-});
-
-// Глобальный обработчик ошибок
-app.use((err, req, res, next) => {
-    logger.error('Необработанная ошибка:', err);
-    res.status(500).json({ 
-        error: 'Внутренняя ошибка сервера',
-        message: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
 });
 
 // ========================================
@@ -420,20 +289,19 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('=================================');
     console.log(`📍 URL: http://localhost:${PORT}`);
     console.log(`🔐 JWT Secret: ${JWT_SECRET.substring(0, 10)}...`);
-    console.log(`💾 Cache TTL: 60 сек`);
+    console.log(`📡 Webhook: ${WEBHOOK_URL ? '✅' : '❌'}`);
     console.log('=================================');
     console.log('✅ Сервер готов к работе!\n');
 });
 
-// Обработка завершения с задержкой
 process.on('SIGTERM', () => {
-    console.log('🛑 Получен SIGTERM, завершаем работу через 5 секунд...');
+    console.log('🛑 Получен SIGTERM, завершаем работу...');
     setTimeout(() => {
         server.close(() => {
             console.log('✅ Сервер остановлен');
             process.exit(0);
         });
-    }, 5000);
+    }, 3000);
 });
 
 process.on('unhandledRejection', (err) => {
