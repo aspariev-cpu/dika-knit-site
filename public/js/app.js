@@ -7,6 +7,8 @@
 // ========================================
 
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 Dika Knit Mobile загружен');
+
     // Проверяем авторизацию
     const user = await checkAuth();
     if (!user) return;
@@ -27,6 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Загружаем данные
     await loadDashboard();
     await setupTabs();
+    startAutoRefresh();
 });
 
 // ========================================
@@ -34,6 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ========================================
 
 async function loadDashboard() {
+    console.log('📊 Загрузка дашборда...');
     await Promise.all([
         loadStats(),
         loadTasks(),
@@ -47,17 +51,24 @@ async function loadDashboard() {
 // ========================================
 
 async function loadStats() {
+    const container = document.getElementById('statsGrid');
+    if (!container) return;
+
     try {
         const result = await api.getStats();
-        if (!result.success) return;
+        if (!result.success) {
+            console.warn('⚠️ Ошибка загрузки статистики:', result.error);
+            return;
+        }
 
-        const data = result.data;
+        const data = result.data || {};
         document.getElementById('statToday').textContent = data.totalToday || '--';
         document.getElementById('statTasks').textContent = data.activeTasks || '--';
-        document.getElementById('statMachines').textContent = `${data.activeMachines || 0}/${data.totalMachines || 15}`;
+        document.getElementById('statMachines').textContent = 
+            `${data.activeMachines || 0}/${data.totalMachines || 15}`;
         document.getElementById('statUrgent').textContent = data.urgentTasks || '--';
     } catch (err) {
-        console.error('Ошибка загрузки статистики:', err);
+        console.error('❌ Ошибка загрузки статистики:', err);
     }
 }
 
@@ -72,11 +83,11 @@ async function loadTasks() {
     try {
         const result = await api.getTasks();
         if (!result.success) {
-            container.innerHTML = `<div class="error">Ошибка загрузки</div>`;
+            container.innerHTML = `<div class="error">❌ ${result.error || 'Ошибка загрузки'}</div>`;
             return;
         }
 
-        const data = result.data;
+        const data = result.data || {};
         const allTasks = [...(data.inProgress || []), ...(data.pending || [])];
 
         if (allTasks.length === 0) {
@@ -86,22 +97,22 @@ async function loadTasks() {
 
         container.innerHTML = allTasks.slice(0, 5).map(task => {
             const percent = task.plan > 0 ? Math.round((task.done / task.plan) * 100) : 0;
-            const urgent = task.urgent ? 'urgent' : '';
+            const urgentClass = task.urgent ? 'urgent' : '';
             const urgentIcon = task.urgent ? '🔥' : '';
 
             return `
-                <div class="task-item ${urgent}">
+                <div class="task-item ${urgentClass}">
                     <div class="task-info">
                         <div>
                             <span class="task-id">#${task.id}</span>
-                            <span class="task-model">${task.model}</span>
+                            <span class="task-model">${task.model || '—'}</span>
                             ${urgentIcon}
                         </div>
-                        <div class="task-meta">${task.color} · ${task.done}/${task.plan} шт</div>
+                        <div class="task-meta">${task.color || '—'} · ${task.done || 0}/${task.plan || 0} шт</div>
                     </div>
                     <div class="task-progress">
                         <div class="task-bar">
-                            <div class="fill" style="width: ${percent}%"></div>
+                            <div class="fill" style="width: ${Math.min(percent, 100)}%"></div>
                         </div>
                         <span class="task-percent">${percent}%</span>
                     </div>
@@ -113,7 +124,7 @@ async function loadTasks() {
         if (countEl) countEl.textContent = allTasks.length;
 
     } catch (err) {
-        console.error('Ошибка загрузки заданий:', err);
+        console.error('❌ Ошибка загрузки заданий:', err);
         container.innerHTML = `<div class="error">❌ Ошибка загрузки</div>`;
     }
 }
@@ -129,11 +140,11 @@ async function loadMachines() {
     try {
         const result = await api.getMachines();
         if (!result.success) {
-            container.innerHTML = `<div class="error">Ошибка загрузки</div>`;
+            container.innerHTML = `<div class="error">❌ ${result.error || 'Ошибка загрузки'}</div>`;
             return;
         }
 
-        const data = result.data;
+        const data = result.data || {};
         const machines = data.machines || [];
 
         if (machines.length === 0) {
@@ -143,23 +154,23 @@ async function loadMachines() {
 
         container.innerHTML = machines.map(m => {
             const status = m.isRunning ? '🟢' : '⚪';
-            const hours = Math.floor(m.workedMinutes / 60);
-            const mins = m.workedMinutes % 60;
+            const hours = Math.floor((m.workedMinutes || 0) / 60);
+            const mins = (m.workedMinutes || 0) % 60;
             const timeStr = hours > 0 ? `${hours}ч ${mins}м` : `${mins}м`;
 
             return `
                 <div class="machine-card">
-                    <div class="machine-number">№${m.number}</div>
+                    <div class="machine-number">№${m.number || m.id}</div>
                     <div class="machine-status">${status}</div>
                     ${m.isRunning ? `<div class="machine-time">⏱️ ${timeStr}</div>` : ''}
                     <div class="machine-helper">👤 ${m.hasHelper ? '✅' : '❌'}</div>
                     <div class="machine-actions">
                         ${m.isRunning 
-                            ? `<button class="btn-stop" onclick="stopMachine(${m.number})">⏹</button>`
-                            : `<button class="btn-start" onclick="startMachine(${m.number})">▶</button>`
+                            ? `<button class="btn-stop" onclick="stopMachine(${m.number || m.id})">⏹</button>`
+                            : `<button class="btn-start" onclick="startMachine(${m.number || m.id})">▶</button>`
                         }
                         <button class="btn-helper ${m.hasHelper ? 'active' : ''}" 
-                                onclick="toggleHelper(${m.number})">
+                                onclick="toggleHelper(${m.number || m.id})">
                             👤
                         </button>
                     </div>
@@ -174,7 +185,7 @@ async function loadMachines() {
         }
 
     } catch (err) {
-        console.error('Ошибка загрузки станков:', err);
+        console.error('❌ Ошибка загрузки станков:', err);
         container.innerHTML = `<div class="error">❌ Ошибка загрузки</div>`;
     }
 }
@@ -190,11 +201,11 @@ async function loadSalary() {
     try {
         const result = await api.getSalary();
         if (!result.success) {
-            container.innerHTML = `<div class="error">Ошибка загрузки</div>`;
+            container.innerHTML = `<div class="error">❌ ${result.error || 'Ошибка загрузки'}</div>`;
             return;
         }
 
-        const data = result.data;
+        const data = result.data || {};
 
         container.innerHTML = `
             <div class="salary-card">
@@ -216,7 +227,7 @@ async function loadSalary() {
         `;
 
     } catch (err) {
-        console.error('Ошибка загрузки зарплаты:', err);
+        console.error('❌ Ошибка загрузки зарплаты:', err);
         container.innerHTML = `<div class="error">❌ Ошибка загрузки</div>`;
     }
 }
@@ -231,17 +242,14 @@ function setupTabs() {
 
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
-            // Убираем активные классы
             tabs.forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-            // Добавляем активные классы
             tab.classList.add('active');
             const tabId = tab.dataset.tab;
             const content = document.getElementById(`tab-${tabId}`);
             if (content) content.classList.add('active');
 
-            // Перезагружаем данные при переключении
             if (tabId === 'machines') loadMachines();
             if (tabId === 'tasks') loadTasks();
             if (tabId === 'salary') loadSalary();
@@ -255,46 +263,46 @@ function setupTabs() {
 
 async function startMachine(number) {
     try {
-        const result = await api.sendCommand('start', [number]);
+        const result = await api.startMachine(number);
         if (result.success) {
             showToast(`✅ Станок №${number} запущен!`, 'success');
             await loadMachines();
         } else {
-            showToast(result.error || 'Ошибка запуска', 'error');
+            showToast(result.error || '❌ Ошибка запуска', 'error');
         }
     } catch (err) {
-        showToast('Ошибка соединения', 'error');
+        showToast('❌ Ошибка соединения', 'error');
     }
 }
 
 async function stopMachine(number) {
     try {
-        const result = await api.sendCommand('stop', [number]);
+        const result = await api.stopMachine(number);
         if (result.success) {
             showToast(`⏹️ Станок №${number} остановлен`, 'info');
             await loadMachines();
         } else {
-            showToast(result.error || 'Ошибка остановки', 'error');
+            showToast(result.error || '❌ Ошибка остановки', 'error');
         }
     } catch (err) {
-        showToast('Ошибка соединения', 'error');
+        showToast('❌ Ошибка соединения', 'error');
     }
 }
 
 async function toggleHelper(number) {
     try {
-        const current = document.querySelector(`.machine-card .btn-helper[data-machine="${number}"]`);
-        const state = current?.classList.contains('active') ? 'off' : 'on';
+        const btn = document.querySelector(`.machine-card .btn-helper[data-machine="${number}"]`);
+        const currentState = btn?.classList.contains('active') ? 'off' : 'on';
         
-        const result = await api.sendCommand('helper', [number, state]);
+        const result = await api.toggleHelper(number, currentState);
         if (result.success) {
-            showToast(`👤 Срезальщица ${state === 'on' ? 'включена' : 'выключена'} на станке №${number}`, 'info');
+            showToast(`👤 Срезальщица ${currentState === 'on' ? 'включена' : 'выключена'} на станке №${number}`, 'info');
             await loadMachines();
         } else {
-            showToast(result.error || 'Ошибка', 'error');
+            showToast(result.error || '❌ Ошибка', 'error');
         }
     } catch (err) {
-        showToast('Ошибка соединения', 'error');
+        showToast('❌ Ошибка соединения', 'error');
     }
 }
 
@@ -309,6 +317,7 @@ function startAutoRefresh() {
     
     refreshInterval = setInterval(() => {
         const path = window.location.pathname;
+        console.log('🔄 Автообновление...');
         
         if (path === '/dashboard' || path === '/') {
             loadDashboard();
@@ -321,13 +330,25 @@ function startAutoRefresh() {
                 if (tabId === 'salary') loadSalary();
             }
         }
-    }, 30000); // 30 секунд
+    }, 30000);
 }
 
-// Запускаем автообновление
-startAutoRefresh();
+// ========================================
+//  КОМАНДЫ ДЛЯ КОНСОЛИ (для тестирования)
+// ========================================
 
-// Останавливаем при уходе со страницы
-window.addEventListener('beforeunload', () => {
-    if (refreshInterval) clearInterval(refreshInterval);
-});
+if (window) {
+    window.api = api;
+    window.loadMachines = loadMachines;
+    window.loadTasks = loadTasks;
+    window.loadStats = loadStats;
+    window.loadSalary = loadSalary;
+    window.startMachine = startMachine;
+    window.stopMachine = stopMachine;
+    window.toggleHelper = toggleHelper;
+    console.log('💡 Доступны команды:');
+    console.log('   api.startMachine(3)  — запустить станок');
+    console.log('   api.stopMachine(3)   — остановить станок');
+    console.log('   loadMachines()       — обновить станки');
+    console.log('   loadTasks()          — обновить задания');
+}
