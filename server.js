@@ -8,15 +8,16 @@ const NodeCache = require('node-cache');
 const path = require('path');
 
 const app = express();
+
+// ✅ КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Доверять прокси
+app.set('trust proxy', true);
+
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dika-mobile-secret-2024';
 const MOBILE_SECRET_KEY = process.env.MOBILE_SECRET_KEY || 'DikaKnitMobile2024SecureKey';
 const COMMANDS_CHANNEL = process.env.MOBILE_COMMANDS_CHANNEL;
 
-// ========================================
-//  MIDDLEWARE
-// ========================================
-
+// === MIDDLEWARE ===
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
