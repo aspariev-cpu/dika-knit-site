@@ -394,33 +394,28 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('=================================');
     console.log(`📍 URL: http://localhost:${PORT}`);
     console.log(`🔐 JWT Secret: ${JWT_SECRET.substring(0, 10)}...`);
-    console.log(`🔑 Mobile Secret: ${MOBILE_SECRET_KEY.substring(0, 10)}...`);
-    console.log(`💾 Cache TTL: ${CACHE_TTL / 1000} сек`);
-    console.log(`📡 Webhook: ${process.env.DISCORD_WEBHOOK_URL ? '✅' : '❌ (не настроен)'}`);
+    console.log(`💾 Cache TTL: 60 сек`);
     console.log('=================================');
     console.log('✅ Сервер готов к работе!\n');
 });
 
-// Graceful shutdown
+// Обработка завершения с задержкой
 process.on('SIGTERM', () => {
-    console.log('🛑 Получен SIGTERM, завершаем работу...');
-    server.close(() => {
-        console.log('✅ Сервер остановлен');
-        process.exit(0);
-    });
+    console.log('🛑 Получен SIGTERM, завершаем работу через 5 секунд...');
+    setTimeout(() => {
+        server.close(() => {
+            console.log('✅ Сервер остановлен');
+            process.exit(0);
+        });
+    }, 5000);
 });
 
-// Обработка непойманных ошибок
 process.on('unhandledRejection', (err) => {
-    logger.error('Unhandled Rejection:', err);
+    console.error('Unhandled Rejection:', err);
 });
 
 process.on('uncaughtException', (err) => {
-    logger.error('Uncaught Exception:', err);
+    console.error('Uncaught Exception:', err);
 });
-
-// ========================================
-//  ЭКСПОРТ (для тестов)
-// ========================================
 
 module.exports = app;
